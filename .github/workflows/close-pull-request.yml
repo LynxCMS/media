@@ -1,0 +1,19 @@
+# This repository is a read-only split of LynxCMS/lynxcms: pull requests belong in the monorepo.
+name: Close pull requests
+
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr close "$PR" --repo "$REPO" --comment "Thank you! This repository is a read-only split of the Lynx CMS monorepo. Please open your pull request at https://github.com/LynxCMS/lynxcms instead."
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
