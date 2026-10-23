@@ -17,7 +17,7 @@ final class FilesType extends MediaFieldType
 
     public static function description(): string
     {
-        return 'Files that belong to the page (PDFs, documents), sortable, each with a description per language and tags. Upload with media.store, then save the returned entries.';
+        return 'Files that belong to the page (PDFs, documents), sortable, each with a description and tags. Descriptions are per language. Upload with media.store, then save the returned entries.';
     }
 
     protected function defaultExtensions(): string

@@ -24,7 +24,7 @@ final class ImagesType extends MediaFieldType
 
     public static function description(): string
     {
-        return 'Images that belong to the page, sortable, each with a focus point, a description per language and tags. Upload with media.store, then save the returned entries. Setting "max_files": 1 makes it a single image.';
+        return 'Images that belong to the page, sortable, each with a focus point, a description and tags. Descriptions are per language. Upload with media.store, then save the returned entries. Setting "max_files": 1 makes it a single image.';
     }
 
     public function settingsSchema(JsonSchema $schema): array
