@@ -7,7 +7,6 @@ namespace LynxCms\Media\Actions;
 use finfo;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +18,7 @@ use LynxCms\Core\Fields\Items\ItemFieldType;
 use LynxCms\Core\Models\Field;
 use LynxCms\Core\Pages\Page;
 use LynxCms\Core\Support\Value;
+use LynxCms\Media\Downloads\RemoteFile;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Fields\MediaFieldType;
 use LynxCms\Media\MediaPaths;
@@ -26,7 +26,7 @@ use Throwable;
 
 /**
  * Stores a file for a page's media field and returns the entry to save in it (ADR-0046): from an
- * admin upload, a URL or base64. Checks the field's extensions, size and dimensions, scales images
+ * admin upload, a URL (public servers only, see RemoteFile) or base64. Checks the field's extensions, size and dimensions, scales images
  * down to the field's maximum, and writes {root}/{page id}/{name}. The page's value does not change
  * until pages.save adds the entry; files never saved are removed by media.prune.
  */
@@ -36,9 +36,7 @@ final class StoreMedia extends Action
 
     private const int DEFAULT_MAX_SIDE = 2560;
 
-    private const int URL_TIMEOUT_SECONDS = 20;
-
-    public function __construct(private readonly MediaPaths $paths) {}
+    public function __construct(private readonly MediaPaths $paths, private readonly RemoteFile $remote) {}
 
     public static function name(): string
     {
@@ -72,7 +70,7 @@ final class StoreMedia extends Action
         return [
             'page' => $schema->string()->description('Id, default-language path or name of the page.')->required(),
             'field' => $schema->string()->description('Name of an images or files field of the page\'s template.')->required(),
-            'url' => $schema->string()->description('Download the file from this URL.'),
+            'url' => $schema->string()->description('Download the file from this URL, on a public web server (http or https).'),
             'base64' => $schema->string()->description('Or the file\'s content, base64 encoded.'),
             'filename' => $schema->string()->description('Name to store it under, e.g. "poster.jpg". Defaults to the URL\'s name.'),
         ];
@@ -88,15 +86,16 @@ final class StoreMedia extends Action
         $field = $this->mediaField($page, (string) $input->string('field'));
         $type = $field->fieldType();
         assert($type instanceof MediaFieldType);
-        [$contents, $name] = $this->contents($input, $context);
         $settings = $field->config();
+        $maxBytes = Value::int($settings['max_kb'] ?? self::DEFAULT_MAX_KB, self::DEFAULT_MAX_KB) * 1024;
+        [$contents, $name] = $this->contents($input, $context, $maxBytes);
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
         if (! in_array($extension, $type->extensions($settings), true)) {
             throw ValidationException::withMessages(['filename' => "Files of type [{$extension}] are not allowed here. Allowed: ".implode(', ', $type->extensions($settings)).'.']);
         }
 
-        if (strlen($contents) > Value::int($settings['max_kb'] ?? self::DEFAULT_MAX_KB, self::DEFAULT_MAX_KB) * 1024) {
+        if (strlen($contents) > $maxBytes) {
             throw ValidationException::withMessages(['file' => 'The file is larger than this field allows.']);
         }
 
@@ -141,7 +140,7 @@ final class StoreMedia extends Action
     /**
      * @return array{0: string, 1: string} contents and file name
      */
-    private function contents(Input $input, ActionContext $context): array
+    private function contents(Input $input, ActionContext $context, int $maxBytes): array
     {
         $name = Value::string($input->get('filename'));
 
@@ -155,15 +154,9 @@ final class StoreMedia extends Action
         }
 
         if ($input->string('url') !== null) {
-            $url = $input->string('url');
+            [$contents, $urlName] = $this->remote->download($input->string('url'), $maxBytes);
 
-            try {
-                $response = Http::timeout(self::URL_TIMEOUT_SECONDS)->get($url)->throw();
-            } catch (Throwable) {
-                throw ValidationException::withMessages(['url' => "The file at [{$url}] could not be downloaded."]);
-            }
-
-            return [$response->body(), $name !== '' ? $name : basename((string) parse_url($url, PHP_URL_PATH))];
+            return [$contents, $name !== '' ? $name : $urlName];
         }
 
         $decoded = base64_decode(Value::string($input->get('base64')), true);

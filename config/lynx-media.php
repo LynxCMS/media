@@ -19,6 +19,16 @@ return [
     'root' => 'lynx',
 
     /*
+    | media.store can download a file from a URL (the admin, MCP clients and the agent use it).
+    | Only http and https on their default ports, from hosts that resolve to public addresses.
+    | allowed_hosts lifts those checks for hosts you trust, such as your own asset server.
+    */
+    'downloads' => [
+        'enabled' => (bool) env('LYNX_MEDIA_URL_DOWNLOADS', true),
+        'allowed_hosts' => [],
+    ],
+
+    /*
     | JPEG and WebP quality of variations, 1 to 100.
     */
     'quality' => (int) env('LYNX_MEDIA_QUALITY', 82),

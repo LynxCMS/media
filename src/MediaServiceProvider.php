@@ -18,6 +18,8 @@ use LynxCms\Media\Actions\PruneMedia;
 use LynxCms\Media\Actions\StoreMedia;
 use LynxCms\Media\Admin\AdminIntegration;
 use LynxCms\Media\Console\PruneMediaCommand;
+use LynxCms\Media\Downloads\DnsHostResolver;
+use LynxCms\Media\Downloads\HostResolver;
 use LynxCms\Media\Fields\FilesType;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Http\ServePrivateMedia;
@@ -35,6 +37,7 @@ final class MediaServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(self::ROOT.'/config/lynx-media.php', 'lynx-media');
         $this->app->singleton(MediaPaths::class);
+        $this->app->singleton(HostResolver::class, DnsHostResolver::class);
         $this->app->singleton(MovePrivateMedia::class);
         $this->app->singleton(PageFiles::class, MediaPageFiles::class);
     }
