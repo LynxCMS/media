@@ -11,6 +11,8 @@ use LynxCms\Core\Pages\PageGates;
 use LynxCms\Core\Pages\PageLoader;
 use LynxCms\Core\Pages\Publication;
 use LynxCms\Core\Pages\Visibility\PageVisibility;
+use LynxCms\Core\Support\Value;
+use LynxCms\Media\Fields\FileTypes;
 use LynxCms\Media\MediaPaths;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -45,10 +47,14 @@ final readonly class ServePrivateMedia
             return $refusal;
         }
 
+        // Only images, video, audio, PDFs and plain text open in the browser, never sniffed as
+        // another type, and sandboxed so that even those cannot run script on the site.
         return $disk->response($path, $file, [
             'Cache-Control' => 'private, max-age=0, must-revalidate',
             'X-Robots-Tag' => 'noindex',
-        ]);
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => 'sandbox',
+        ], FileTypes::opensInBrowser(Value::string($disk->mimeType($path))) ? 'inline' : 'attachment');
     }
 
     /** Null when the request may have the page's files, else what to answer instead. */

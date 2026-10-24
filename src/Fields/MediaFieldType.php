@@ -81,7 +81,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
     {
         return [
             'max_files' => ['sometimes', 'integer', 'min:0'],
-            'extensions' => ['sometimes', 'string', 'regex:/^[a-z0-9 ]+$/'],
+            'extensions' => ['sometimes', 'string', 'regex:/^[a-z0-9 ]+$/', FileTypes::rule()],
             'max_kb' => ['sometimes', 'integer', 'min:1'],
             'tags' => ['sometimes', 'array'],
             'tags.*' => ['string', 'max:64'],
@@ -105,12 +105,15 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
     }
 
     /**
+     * The extensions the field allows, never one of FileTypes::NEVER, even if an older setting
+     * lists it.
+     *
      * @param  array<string, mixed>  $settings
      * @return list<string>
      */
     public function extensions(array $settings): array
     {
-        return array_values(array_filter(explode(' ', Value::string($settings['extensions'] ?? '', $this->defaultExtensions()) ?: $this->defaultExtensions())));
+        return FileTypes::allowed(array_values(array_filter(explode(' ', Value::string($settings['extensions'] ?? '', $this->defaultExtensions()) ?: $this->defaultExtensions()))));
     }
 
     public function normalize(mixed $value, array $settings): mixed
