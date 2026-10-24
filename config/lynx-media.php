@@ -10,6 +10,12 @@ return [
     */
     'disk' => env('LYNX_MEDIA_DISK', 'public'),
 
+    /*
+    | The disk for files of private fields (a files or images field with "private" on, ADR-0077):
+    | never public, served through /lynx-media/{page}/{file}, which asks the page's own questions.
+    */
+    'private_disk' => env('LYNX_MEDIA_PRIVATE_DISK', 'local'),
+
     'root' => 'lynx',
 
     /*

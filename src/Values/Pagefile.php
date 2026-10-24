@@ -35,7 +35,13 @@ class Pagefile implements Stringable
 
     public function url(): string
     {
-        return app(MediaPaths::class)->url($this->file());
+        return app(MediaPaths::class)->url($this->file(), $this->isPrivate());
+    }
+
+    /** Whether the file belongs to a private field, served through Lynx's route (ADR-0077). */
+    public function isPrivate(): bool
+    {
+        return (bool) ($this->values['private'] ?? false);
     }
 
     public function name(): string

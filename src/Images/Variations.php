@@ -49,7 +49,7 @@ final readonly class Variations
      */
     public function write(Pageimage $original, string $file, array $spec): void
     {
-        $disk = $this->paths->disk();
+        $disk = $this->paths->disk($original->isPrivate());
 
         if ($disk->exists($this->paths->path($file))) {
             return;
@@ -62,7 +62,7 @@ final readonly class Variations
 
     private function render(Pageimage $image, int $width, int $height, bool $crop, int $quality, ?string $format): string
     {
-        $made = Image::fromStorage($this->paths->path($image->file()), $this->paths->diskName())->orient();
+        $made = Image::fromStorage($this->paths->path($image->file()), $this->paths->diskName($image->isPrivate()))->orient();
 
         if ($crop) {
             $focus = $image->focus();

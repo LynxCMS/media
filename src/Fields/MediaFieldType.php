@@ -19,6 +19,7 @@ use LynxCms\Core\Fields\NeedsSavedPage;
 use LynxCms\Core\Languages\LanguageRegistry;
 use LynxCms\Core\Models\Field;
 use LynxCms\Core\Support\Value;
+use LynxCms\Media\MediaPaths;
 use LynxCms\Media\Values\MediaList;
 use LynxCms\Media\Values\Pagefile;
 
@@ -72,6 +73,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'extensions' => $schema->string()->description('Allowed extensions, space separated. Default "'.$this->defaultExtensions().'".'),
             'max_kb' => $schema->integer()->description('Largest upload in kilobytes. Default 10240.'),
             'tags' => $schema->array()->items($schema->string())->description('Tags editors may choose; empty allows any tag.'),
+            'private' => $schema->boolean()->description('Keep the files private: stored off the public disk and served only to visitors who may open the page. Switching moves existing files.'),
         ];
     }
 
@@ -83,7 +85,18 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'max_kb' => ['sometimes', 'integer', 'min:1'],
             'tags' => ['sometimes', 'array'],
             'tags.*' => ['string', 'max:64'],
+            'private' => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * Whether the field's files are private (ADR-0077).
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    public static function isPrivate(array $settings): bool
+    {
+        return (bool) ($settings['private'] ?? false);
     }
 
     public function subfields(array $settings, ?string $type): array
@@ -175,7 +188,8 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
 
     public function mapFiles(mixed $value, Closure $map, array $settings): mixed
     {
-        return array_map(function (mixed $item) use ($map): mixed {
+        // Content packages store each file through $map without naming the field: say which disk.
+        return app(MediaPaths::class)->writing(self::isPrivate($settings), fn (): array => array_map(function (mixed $item) use ($map): mixed {
             $item = Value::array($item);
             $values = Value::map($item['values'] ?? []);
 
@@ -184,7 +198,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             }
 
             return ['values' => $values] + $item;
-        }, Value::list($value));
+        }, Value::list($value)));
     }
 
     public function present(mixed $value, Field $field): mixed
@@ -195,7 +209,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             $item = Value::array($item);
 
             if ((bool) ($item['enabled'] ?? true)) {
-                $files[] = $this->file(Value::string($item['key'] ?? ''), Value::map($item['values'] ?? []));
+                $files[] = $this->file(Value::string($item['key'] ?? ''), ['private' => self::isPrivate($field->config())] + Value::map($item['values'] ?? []));
             }
         }
 

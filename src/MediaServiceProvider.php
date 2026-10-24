@@ -7,6 +7,7 @@ namespace LynxCms\Media;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use LynxCms\Admin\AdminServiceProvider;
 use LynxCms\Core\Actions\ActionRegistry;
@@ -19,6 +20,7 @@ use LynxCms\Media\Admin\AdminIntegration;
 use LynxCms\Media\Console\PruneMediaCommand;
 use LynxCms\Media\Fields\FilesType;
 use LynxCms\Media\Fields\ImagesType;
+use LynxCms\Media\Http\ServePrivateMedia;
 use LynxCms\Media\View\ImageComponent;
 
 /**
@@ -33,6 +35,7 @@ final class MediaServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(self::ROOT.'/config/lynx-media.php', 'lynx-media');
         $this->app->singleton(MediaPaths::class);
+        $this->app->singleton(MovePrivateMedia::class);
         $this->app->singleton(PageFiles::class, MediaPageFiles::class);
     }
 
@@ -41,6 +44,10 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->make(FieldTypeRegistry::class)->register(ImagesType::class, FilesType::class);
         $this->app->make(ActionRegistry::class)->register(StoreMedia::class, PruneMedia::class);
         Event::listen(PageDeleted::class, DeleteMediaFolders::class);
+        // Private fields' files (ADR-0077): before Lynx's catch-all page route.
+        Route::get('lynx-media/{page}/{file}', ServePrivateMedia::class)->middleware('web')
+            ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media');
+        $this->app->make(MovePrivateMedia::class)->listen();
         $this->loadViewsFrom(self::ROOT.'/resources/views', 'lynx-media');
         Blade::component('lynx-image', ImageComponent::class);
 

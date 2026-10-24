@@ -106,8 +106,9 @@ final class StoreMedia extends Action
 
         if (! $context->dryRun) {
             $path = $this->paths->path($file);
-            $this->paths->disk()->put($path, Value::string($entry['contents']));
-            DB::afterRollBack(fn () => $this->paths->disk()->delete($path));
+            $disk = $this->paths->disk(MediaFieldType::isPrivate($settings));
+            $disk->put($path, Value::string($entry['contents']));
+            DB::afterRollBack(fn () => $disk->delete($path));
         }
 
         $context->changes->created('file', $file, "Store {$file} for {$field->name} on page {$page->name()}", $values);

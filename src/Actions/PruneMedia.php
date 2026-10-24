@@ -62,22 +62,24 @@ final class PruneMedia extends Action
         $hours = $input->has('older_than_hours') ? Value::int($input->get('older_than_hours')) : Value::int(config('lynx-media.prune_after_hours'), 24);
         $before = now()->subHours($hours)->getTimestamp();
         $used = $this->usedStems();
-        $disk = $this->paths->disk();
         $deleted = 0;
 
-        foreach ($disk->allFiles($this->paths->root()) as $path) {
-            $file = substr($path, strlen($this->paths->root()) + 1);
+        // Public fields' files and private ones' (ADR-0077)
+        foreach ($this->paths->disks() as $disk) {
+            foreach ($disk->allFiles($this->paths->root()) as $path) {
+                $file = substr($path, strlen($this->paths->root()) + 1);
 
-            if (isset($used[$this->stem($file)]) || $disk->lastModified($path) > $before) {
-                continue;
+                if (isset($used[$this->stem($file)]) || $disk->lastModified($path) > $before) {
+                    continue;
+                }
+
+                if (! $context->dryRun) {
+                    $disk->delete($path);
+                }
+
+                $deleted++;
+                $context->changes->deleted('file', $file, "Delete unused media file {$file}");
             }
-
-            if (! $context->dryRun) {
-                $disk->delete($path);
-            }
-
-            $deleted++;
-            $context->changes->deleted('file', $file, "Delete unused media file {$file}");
         }
 
         return ['deleted' => $deleted];

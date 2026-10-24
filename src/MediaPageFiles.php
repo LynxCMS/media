@@ -17,11 +17,18 @@ final readonly class MediaPageFiles implements PageFiles
 {
     public function __construct(private MediaPaths $paths) {}
 
+    /** The file from whichever disk holds it: public fields' or private ones' (ADR-0077). */
     public function read(string $file): ?string
     {
         $path = $this->paths->path($file);
 
-        return $this->paths->disk()->exists($path) ? $this->paths->disk()->get($path) : null;
+        foreach ($this->paths->disks() as $disk) {
+            if ($disk->exists($path)) {
+                return $disk->get($path);
+            }
+        }
+
+        return null;
     }
 
     public function write(int $pageId, string $file, string $contents, bool $dryRun = false): string

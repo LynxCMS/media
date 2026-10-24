@@ -19,7 +19,9 @@ final readonly class DeleteMediaFolders
     public function handle(PageDeleted $event): void
     {
         foreach ($event->pageIds as $pageId) {
-            $this->paths->disk()->deleteDirectory($this->paths->folder($pageId));
+            foreach ($this->paths->disks() as $disk) {
+                $disk->deleteDirectory($this->paths->folder($pageId));
+            }
         }
     }
 }
