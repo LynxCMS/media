@@ -152,7 +152,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         $values = Value::map($raw['values'] ?? []);
         $file = Value::string($values['file'] ?? '');
 
-        if (preg_match('/^\d+\/[A-Za-z0-9._-]+$/', $file) !== 1) {
+        if (preg_match('/^\d+\/(?!\.)[A-Za-z0-9._-]+$/', $file) !== 1) {
             $errors["{$index}.file"] = 'Each file needs its stored name, such as "42/photo.jpg" (media.store returns it).';
         }
 

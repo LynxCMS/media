@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use LynxCms\Contracts\Actions\Actor;
 use LynxCms\Core\Actions\Action;
 use LynxCms\Core\Actions\Runner\ActionContext;
 use LynxCms\Core\Actions\Runner\Input;
@@ -25,16 +24,20 @@ use LynxCms\Media\MediaPaths;
 use Throwable;
 
 /**
- * Stores a file for a page's media field and returns the entry to save in it (ADR-0046): from an
- * admin upload, a URL (public servers only, see RemoteFile) or base64. Checks the field's extensions, size and dimensions, scales images
- * down to the field's maximum, and writes {root}/{page id}/{name}. The page's value does not change
- * until pages.save adds the entry; files never saved are removed by media.prune.
+ * Stores a file for a page's media field and returns the entry to save in it (ADR-0046): from a
+ * URL (public servers only, see RemoteFile) or base64, which is how the admin sends uploads.
+ * Checks the field's extensions, size and dimensions, scales images down to the field's maximum,
+ * and writes {root}/{page id}/{name}. The page's value does not change until pages.save adds the
+ * entry; files never saved are removed by media.prune.
  */
 final class StoreMedia extends Action
 {
     private const int DEFAULT_MAX_KB = 10240;
 
     private const int DEFAULT_MAX_SIDE = 2560;
+
+    /** Largest image decoded, in pixels: about 8000 × 6000. */
+    private const int MAX_PIXELS = 50_000_000;
 
     public function __construct(private readonly MediaPaths $paths, private readonly RemoteFile $remote) {}
 
@@ -60,7 +63,6 @@ final class StoreMedia extends Action
             'field' => ['required', 'string'],
             'url' => ['sometimes', 'nullable', 'url'],
             'base64' => ['sometimes', 'nullable', 'string'],
-            'upload' => ['sometimes', 'nullable', 'string'],
             'filename' => ['sometimes', 'nullable', 'string', 'max:200'],
         ];
     }
@@ -88,7 +90,7 @@ final class StoreMedia extends Action
         assert($type instanceof MediaFieldType);
         $settings = $field->config();
         $maxBytes = Value::int($settings['max_kb'] ?? self::DEFAULT_MAX_KB, self::DEFAULT_MAX_KB) * 1024;
-        [$contents, $name] = $this->contents($input, $context, $maxBytes);
+        [$contents, $name] = $this->contents($input, $maxBytes);
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
         if (! in_array($extension, $type->extensions($settings), true)) {
@@ -140,18 +142,9 @@ final class StoreMedia extends Action
     /**
      * @return array{0: string, 1: string} contents and file name
      */
-    private function contents(Input $input, ActionContext $context, int $maxBytes): array
+    private function contents(Input $input, int $maxBytes): array
     {
         $name = Value::string($input->get('filename'));
-
-        if ($input->string('upload') !== null) {
-            // Admin uploads only: a Livewire temporary file, never a path an agent chose.
-            if (in_array($context->actor->kind, [Actor::MCP, Actor::AI], true) || ! is_file($input->string('upload'))) {
-                throw ValidationException::withMessages(['upload' => 'Uploads come from the admin; give a url or base64.']);
-            }
-
-            return [(string) file_get_contents($input->string('upload')), $name !== '' ? $name : basename($input->string('upload'))];
-        }
 
         if ($input->string('url') !== null) {
             [$contents, $urlName] = $this->remote->download($input->string('url'), $maxBytes);
@@ -176,6 +169,14 @@ final class StoreMedia extends Action
      */
     private function image(string $contents, array $settings): array
     {
+        // A small file can declare a huge canvas; refuse it from its header, before decoding it.
+        // Data that is no image makes getimagesizefromstring warn; the decoder below reports it.
+        $declared = @getimagesizefromstring($contents);
+
+        if ($declared !== false && $declared[0] * $declared[1] > self::MAX_PIXELS) {
+            throw ValidationException::withMessages(['file' => 'The image is too large to process ('.$declared[0].' × '.$declared[1].').']);
+        }
+
         try {
             $image = Image::fromBytes($contents)->orient();
             [$width, $height] = [$image->width(), $image->height()];

@@ -62,11 +62,20 @@ final class MediaField extends Component
         abort_if($this->disabled || $this->pageId === null, 403);
 
         foreach ($this->uploads as $upload) {
+            $contents = $upload->get();
+
+            if ($contents === false) {
+                $this->addError('uploads', $upload->getClientOriginalName().': the upload could not be read. Try again.');
+
+                continue;
+            }
+
             try {
                 $values = lynx()->run(StoreMedia::class, [
                     'page' => $this->pageId,
                     'field' => $this->field,
-                    'upload' => $upload->getRealPath(),
+                    // The contents, never a path: no caller of media.store names a file on the server.
+                    'base64' => base64_encode($contents),
                     'filename' => $upload->getClientOriginalName(),
                 ])->value;
                 $this->items[] = Value::map(Value::list(app(MediaConverter::class)->toForm([['key' => (string) Str::ulid(), 'values' => $values]]))[0] ?? []);

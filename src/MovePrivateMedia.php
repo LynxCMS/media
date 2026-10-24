@@ -79,39 +79,41 @@ final class MovePrivateMedia
     }
 
     /**
-     * Every stored file the field's values name, wherever they are kept.
+     * Every stored file the field's values name, wherever they are kept, and only in the folder of
+     * the page holding the value (or of the page a draft belongs to): a value naming another
+     * page's file never makes that file change disks.
      *
      * @return list<string>
      */
     private function files(Field $field): array
     {
         $files = [];
-
-        foreach (DB::table($field->table())->where('language_id', 0)->pluck('data') as $data) {
-            $this->collect([$field->name => json_decode(Value::string($data), true)], $field->name, $files);
-        }
+        $originals = array_map(Value::int(...), DB::table(Tables::PAGES)->whereNotNull('draft_of')->pluck('draft_of', 'id')->all());
+        $sources = [DB::table($field->table())->where('language_id', 0)->get(['page_id', 'data'])->map(fn (object $row): array => [$row->page_id, [$field->name => json_decode(Value::string($row->data), true)]])->all()];
 
         foreach (lynx()->fields->all() as $other) {
             if ($other->fieldType() instanceof ItemFieldType && $other->name !== $field->name) {
-                foreach (DB::table($other->table())->pluck('data') as $data) {
-                    $this->collect(json_decode(Value::string($data), true), $field->name, $files);
-                }
+                $sources[] = DB::table($other->table())->get(['page_id', 'data'])->map(fn (object $row): array => [$row->page_id, json_decode(Value::string($row->data), true)])->all();
             }
         }
 
-        foreach (DB::table(Tables::REVISIONS)->pluck('values') as $values) {
-            $this->collect(json_decode(Value::string($values), true), $field->name, $files);
+        $sources[] = DB::table(Tables::REVISIONS)->get(['page_id', 'values'])->map(fn (object $row): array => [$row->page_id, json_decode(Value::string($row->values), true)])->all();
+
+        foreach (array_merge(...$sources) as [$pageId, $data]) {
+            $pageId = Value::int($pageId);
+            $this->collect($data, $field->name, [(string) $pageId, (string) ($originals[$pageId] ?? $pageId)], $files);
         }
 
         return array_values(array_unique($files));
     }
 
     /**
-     * Files of the media items under the key $name, anywhere in $data.
+     * Files of the media items under the key $name, anywhere in $data, that sit in one of $folders.
      *
+     * @param  list<string>  $folders
      * @param  list<string>  $files
      */
-    private function collect(mixed $data, string $name, array &$files): void
+    private function collect(mixed $data, string $name, array $folders, array &$files): void
     {
         if (! is_array($data)) {
             return;
@@ -122,12 +124,12 @@ final class MovePrivateMedia
                 foreach ($value as $item) {
                     $file = is_array($item) ? Value::string(Value::map($item['values'] ?? [])['file'] ?? '') : '';
 
-                    if ($file !== '') {
+                    if ($file !== '' && in_array(strstr($file, '/', true), $folders, true)) {
                         $files[] = $file;
                     }
                 }
             } else {
-                $this->collect($value, $name, $files);
+                $this->collect($value, $name, $folders, $files);
             }
         }
     }
