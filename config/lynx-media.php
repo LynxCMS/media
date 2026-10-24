@@ -23,6 +23,16 @@ return [
     | Only http and https on their default ports, from hosts that resolve to public addresses.
     | allowed_hosts lifts those checks for hosts you trust, such as your own asset server.
     */
+    /*
+    | On a developer's machine: the https address of production's media folder, such as
+    | https://www.example.com/storage/lynx or your CDN's. Files the content came without are then
+    | downloaded from it when a page needs them (ADR-0082). Ignored in production.
+    */
+    'remote' => [
+        'url' => env('LYNX_MEDIA_REMOTE'),
+        'max_kb' => 51200,
+    ],
+
     'downloads' => [
         'enabled' => (bool) env('LYNX_MEDIA_URL_DOWNLOADS', true),
         'allowed_hosts' => [],

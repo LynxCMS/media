@@ -7,6 +7,7 @@ namespace LynxCms\Media\Images;
 use Illuminate\Support\Facades\Image;
 use LynxCms\Core\Support\Value;
 use LynxCms\Media\MediaPaths;
+use LynxCms\Media\Remote\RemoteMedia;
 use LynxCms\Media\Values\Pageimage;
 
 /**
@@ -19,7 +20,7 @@ use LynxCms\Media\Values\Pageimage;
  */
 final readonly class Variations
 {
-    public function __construct(private MediaPaths $paths) {}
+    public function __construct(private MediaPaths $paths, private RemoteMedia $remote) {}
 
     /**
      * The variation of an original image, named and measured but not made yet: its file is
@@ -53,6 +54,11 @@ final readonly class Variations
 
         if ($disk->exists($this->paths->path($file))) {
             return;
+        }
+
+        // On a developer's machine the original may still be on production (ADR-0082).
+        if (! $original->isPrivate()) {
+            $this->remote->ensure($original->file());
         }
 
         $crop = (bool) $spec['crop'];

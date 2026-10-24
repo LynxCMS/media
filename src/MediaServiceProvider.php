@@ -18,11 +18,13 @@ use LynxCms\Media\Actions\PruneMedia;
 use LynxCms\Media\Actions\StoreMedia;
 use LynxCms\Media\Admin\AdminIntegration;
 use LynxCms\Media\Console\PruneMediaCommand;
+use LynxCms\Media\Console\PullMediaCommand;
 use LynxCms\Media\Downloads\DnsHostResolver;
 use LynxCms\Media\Downloads\HostResolver;
 use LynxCms\Media\Fields\FilesType;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Http\ServePrivateMedia;
+use LynxCms\Media\Http\ServeRemoteMedia;
 use LynxCms\Media\View\ImageComponent;
 
 /**
@@ -50,6 +52,7 @@ final class MediaServiceProvider extends ServiceProvider
         // Private fields' files (ADR-0077): before Lynx's catch-all page route.
         Route::get('lynx-media/{page}/{file}', ServePrivateMedia::class)->middleware('web')
             ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media');
+        $this->registerRemoteRoute();
         $this->app->make(MovePrivateMedia::class)->listen();
         $this->loadViewsFrom(self::ROOT.'/resources/views', 'lynx-media');
         Blade::component('lynx-image', ImageComponent::class);
@@ -59,10 +62,25 @@ final class MediaServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneMediaCommand::class]);
+            $this->commands([PruneMediaCommand::class, PullMediaCommand::class]);
             $this->publishes([self::ROOT.'/config/lynx-media.php' => config_path('lynx-media.php')], 'lynx-media-config');
         }
 
         $this->callAfterResolving(Schedule::class, fn (Schedule $schedule) => $schedule->command('lynx:media:prune')->daily()->withoutOverlapping());
+    }
+
+    /**
+     * Public media addresses a web server finds no file for reach Laravel; on a developer's
+     * machine with lynx-media.remote.url set, this route downloads them from production (ADR-0082),
+     * and answers 404 otherwise, as before.
+     */
+    private function registerRemoteRoute(): void
+    {
+        $paths = $this->app->make(MediaPaths::class);
+        $prefix = trim((string) parse_url($paths->disk(false)->url($paths->root()), PHP_URL_PATH), '/');
+
+        if ($prefix !== '') {
+            Route::get($prefix.'/{page}/{file}', ServeRemoteMedia::class)->whereNumber('page')->where('file', '[A-Za-z0-9._-]+');
+        }
     }
 }
