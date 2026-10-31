@@ -65,7 +65,7 @@ final class MediaField extends Component
             $contents = $upload->get();
 
             if ($contents === false) {
-                $this->addError('uploads', $upload->getClientOriginalName().': the upload could not be read. Try again.');
+                $this->addError('uploads', __('lynx-media::admin.unreadable', ['file' => $upload->getClientOriginalName()]));
 
                 continue;
             }

@@ -54,6 +54,7 @@ final class MediaServiceProvider extends ServiceProvider
             ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media');
         $this->registerRemoteRoute();
         $this->app->make(MovePrivateMedia::class)->listen();
+        $this->loadTranslationsFrom(self::ROOT.'/lang', 'lynx-media');
         $this->loadViewsFrom(self::ROOT.'/resources/views', 'lynx-media');
         Blade::component('lynx-image', ImageComponent::class);
 
