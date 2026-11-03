@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'drag' => 'Arraste para reordenar',
     'close' => 'Fechar',
+    'zoom' => 'Ver :file em tamanho real',
     'edit' => 'Editar',
     'hide' => 'Ocultar',
     'show' => 'Mostrar',

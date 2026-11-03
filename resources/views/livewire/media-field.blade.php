@@ -1,4 +1,9 @@
-<div class="grid gap-3">
+{{--
+    zoom: the picture a zoom button opened, shown at full size in the field's one dialog. Its id is
+    lower case: HTML lowers the dialog's event listener name, and Livewire ids have capitals.
+--}}
+@php($zoomDialog = 'media-zoom-'.strtolower($this->getId()))
+<div class="grid gap-3" x-data="{ zoom: { url: '', name: '' } }">
     @if ($items !== [])
         <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" @unless ($disabled) wire:sort="sort" @endunless>
             @foreach ($items as $index => $item)
@@ -7,6 +12,13 @@
                     @if ($isImages)
                         <div @class(['relative aspect-[4/3] bg-muted', 'cursor-grab active:cursor-grabbing' => ! $disabled]) @unless ($disabled) wire:sort:handle title="{{ __('lynx-media::admin.drag') }}" @endunless>
                             <img src="{{ $url }}" alt="" class="size-full object-cover" style="object-position: {{ $item['focus']['x'] ?? 50 }}% {{ $item['focus']['y'] ?? 50 }}%" loading="lazy">
+                            @php($name = basename((string) $item['file']))
+                            <button type="button" wire:sort:ignore data-media-zoom
+                                    class="bg-background/85 text-foreground hover:bg-background focus-visible:ring-ring absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-md shadow-sm focus-visible:ring-2 focus-visible:outline-none"
+                                    x-on:click="zoom = { url: {{ Js::from($url) }}, name: {{ Js::from($name) }} }; $dispatch('open-dialog-{{ $zoomDialog }}')"
+                                    aria-label="{{ __('lynx-media::admin.zoom', ['file' => $name]) }}" title="{{ __('lynx-media::admin.zoom', ['file' => $name]) }}">
+                                <x-lucide-zoom-in class="size-4" aria-hidden="true" />
+                            </button>
                         </div>
                     @else
                         <div @class(['flex aspect-[4/3] items-center justify-center bg-muted p-3 text-center text-sm font-medium', 'cursor-grab active:cursor-grabbing' => ! $disabled]) @unless ($disabled) wire:sort:handle title="{{ __('lynx-media::admin.drag') }}" @endunless>
@@ -77,6 +89,15 @@
                 </div>
             @endif
         @endforeach
+    @endif
+
+    @if ($isImages && $items !== [])
+        <x-lynx-admin::ui.dialog :id="$zoomDialog" data-media-viewer>
+            <x-lynx-admin::ui.dialog-content class="w-max max-w-[calc(100vw-2rem)] gap-3 p-3 sm:max-w-[calc(100vw-4rem)]">
+                <x-lynx-admin::ui.dialog-title class="truncate pe-8 text-sm" x-text="zoom.name" />
+                <img :src="zoom.url" :alt="zoom.name" class="max-h-[calc(100vh-8rem)] max-w-full justify-self-center object-contain">
+            </x-lynx-admin::ui.dialog-content>
+        </x-lynx-admin::ui.dialog>
     @endif
 
     @if ($canAdd)
