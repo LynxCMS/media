@@ -12,6 +12,7 @@ use Illuminate\Support\ServiceProvider;
 use LynxCms\Admin\AdminServiceProvider;
 use LynxCms\Core\Actions\ActionRegistry;
 use LynxCms\Core\Content\PageFiles;
+use LynxCms\Core\Doctor\DoctorChecks;
 use LynxCms\Core\Events\PageDeleted;
 use LynxCms\Core\Fields\FieldTypeRegistry;
 use LynxCms\Media\Actions\PruneMedia;
@@ -19,6 +20,7 @@ use LynxCms\Media\Actions\StoreMedia;
 use LynxCms\Media\Admin\AdminIntegration;
 use LynxCms\Media\Console\PruneMediaCommand;
 use LynxCms\Media\Console\PullMediaCommand;
+use LynxCms\Media\Doctor\StorageLink;
 use LynxCms\Media\Downloads\DnsHostResolver;
 use LynxCms\Media\Downloads\HostResolver;
 use LynxCms\Media\Fields\FilesType;
@@ -49,6 +51,7 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->make(FieldTypeRegistry::class)->register(ImagesType::class, FilesType::class);
         $this->app->make(ActionRegistry::class)->register(StoreMedia::class, PruneMedia::class);
         Event::listen(PageDeleted::class, DeleteMediaFolders::class);
+        $this->app->make(DoctorChecks::class)->add(StorageLink::class);
         // Private fields' files (ADR-0077): before Lynx's catch-all page route.
         Route::get('lynx-media/{page}/{file}', ServePrivateMedia::class)->middleware('web')
             ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media');
