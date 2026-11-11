@@ -4,8 +4,11 @@
     "license": "MIT",
     "require": {
         "php": "^8.5",
-        "intervention/image": "^4.0",
+        "intervention/image": "^4.2",
         "lynxcms/core": "self.version"
+    },
+    "suggest": {
+        "lynxcms/admin": "Adds media uploads and the media screens to the Livewire admin."
     },
     "autoload": {
         "psr-4": { "LynxCms\\Media\\": "src/" }
