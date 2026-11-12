@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LynxCms\Media\Admin\Livewire;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -13,7 +12,7 @@ use Livewire\Attributes\Modelable;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
-use LynxCms\Admin\AdminServiceProvider;
+use LynxCms\Admin\AdminAccess;
 use LynxCms\Admin\Editor\LocalizedForm;
 use LynxCms\Core\Support\Value;
 use LynxCms\Media\Actions\StoreMedia;
@@ -51,9 +50,9 @@ final class MediaField extends Component
     /** The file whose details are open, by key. */
     public ?string $editing = null;
 
-    public function boot(): void
+    public function boot(AdminAccess $access): void
     {
-        Gate::authorize(AdminServiceProvider::GATE);
+        $access->authorizeScreen();
     }
 
     /** Livewire hook: store each upload through media.store and add it to the field. */
