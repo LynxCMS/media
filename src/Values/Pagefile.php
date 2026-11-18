@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LynxCms\Media\Values;
 
+use DateTimeInterface;
 use LynxCms\Core\Support\LocalizedText;
 use LynxCms\Core\Support\Value;
 use LynxCms\Media\MediaPaths;
@@ -36,6 +37,15 @@ class Pagefile implements Stringable
     public function url(): string
     {
         return app(MediaPaths::class)->url($this->file(), $this->isPrivate());
+    }
+
+    /**
+     * A signed link that downloads the file until $expires, whoever holds it: the page's access
+     * rules are not asked. For handing a private file to one visitor, such as a gated download.
+     */
+    public function temporaryUrl(DateTimeInterface $expires): string
+    {
+        return app(MediaPaths::class)->temporaryUrl($this->file(), $this->isPrivate(), $expires);
     }
 
     /** Whether the file belongs to a private field, served through Lynx's route (ADR-0077). */

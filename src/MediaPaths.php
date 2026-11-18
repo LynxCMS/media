@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace LynxCms\Media;
 
 use Closure;
+use DateTimeInterface;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use LynxCms\Core\Support\Value;
 
 /**
@@ -88,6 +90,14 @@ final class MediaPaths
         [$page, $name] = array_pad(explode('/', ltrim($file, '/'), 2), 2, '');
 
         return route('lynx.media', ['page' => $page, 'file' => $name]);
+    }
+
+    /** A signed link to a stored file, public or private, that works until $expires (Pagefile::temporaryUrl()). */
+    public function temporaryUrl(string $file, bool $private, DateTimeInterface $expires): string
+    {
+        [$page, $name] = array_pad(explode('/', ltrim($file, '/'), 2), 2, '');
+
+        return URL::temporarySignedRoute('lynx.media.signed', $expires, array_filter(['page' => $page, 'file' => $name, 'private' => $private ? 1 : null]));
     }
 
     public function root(): string
