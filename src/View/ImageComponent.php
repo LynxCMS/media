@@ -13,7 +13,7 @@ use LynxCms\Media\Values\Pageimage;
  * a cropped (both sizes) or resized size, a srcset of smaller widths, the description as alt text
  * and lazy loading (ADR-0046). Renders nothing without an image.
  *
- * @api
+ * @internal
  */
 final class ImageComponent extends Component
 {

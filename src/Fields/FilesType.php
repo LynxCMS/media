@@ -7,7 +7,11 @@ namespace LynxCms\Media\Fields;
 use LynxCms\Core\Fields\Items\ItemNormalizer;
 use LynxCms\Media\Values\Pagefile;
 
-/** Files of a page: documents, downloads (ADR-0046). */
+/**
+ * Files of a page: documents, downloads (ADR-0046).
+ *
+ * @internal
+ */
 final class FilesType extends MediaFieldType
 {
     public static function name(): string

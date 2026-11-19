@@ -16,6 +16,8 @@ use Override;
  * Queues a download from production for every media file the pages name that this machine lacks
  * (ADR-0082), so a queue worker fills the disk while you work. What isn't fetched yet still
  * downloads when something asks for it.
+ *
+ * @internal
  */
 final class PullMediaCommand extends Command
 {

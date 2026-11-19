@@ -14,6 +14,8 @@ use LynxCms\Media\Values\Pageimage;
 /**
  * Images of a page (ADR-0046): dimensions, a focus point that crops keep in view, a description per
  * language and tags. Templates resize them lazily: $image->size(800, 600), ->resize(400), ->webp().
+ *
+ * @internal
  */
 final class ImagesType extends MediaFieldType
 {

@@ -9,7 +9,11 @@ use LynxCms\Core\Support\Value;
 use LynxCms\Media\Actions\PruneMedia;
 use Override;
 
-/** Deletes media files nothing uses (media.prune); the scheduler runs it daily. */
+/**
+ * Deletes media files nothing uses (media.prune); the scheduler runs it daily.
+ *
+ * @internal
+ */
 final class PruneMediaCommand extends Command
 {
     #[Override]

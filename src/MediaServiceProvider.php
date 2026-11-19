@@ -33,6 +33,8 @@ use LynxCms\Media\View\ImageComponent;
 /**
  * Images and files for Lynx (ADR-0046): the images and files field types, media.store and
  * media.prune, the lynx-image Blade component and, with the admin, the upload input.
+ *
+ * @internal
  */
 final class MediaServiceProvider extends ServiceProvider
 {

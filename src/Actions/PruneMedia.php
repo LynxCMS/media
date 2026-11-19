@@ -19,6 +19,8 @@ use LynxCms\Media\MediaPaths;
  * Deletes media files nothing refers to any more (ADR-0046): not a value of any media field (live
  * pages, drafts, trashed pages) nor of a revision. Variations of a kept file are kept. Only files
  * older than lynx-media.prune_after_hours go, so a file uploaded but not saved yet stays.
+ *
+ * @api
  */
 final class PruneMedia extends Action
 {

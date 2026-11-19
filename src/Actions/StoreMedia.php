@@ -29,6 +29,8 @@ use Throwable;
  * Checks the field's extensions, size and dimensions, scales images down to the field's maximum,
  * and writes {root}/{page id}/{name}. The page's value does not change until pages.save adds the
  * entry; files never saved are removed by media.prune.
+ *
+ * @api
  */
 final class StoreMedia extends Action
 {

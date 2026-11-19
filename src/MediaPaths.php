@@ -16,7 +16,7 @@ use LynxCms\Core\Support\Value;
  * the private disk for private fields (ADR-0077). Stored values hold "{owner page id}/{file}", so a
  * draft's copy of a value points at the same file.
  *
- * @api
+ * @internal
  */
 final class MediaPaths
 {
