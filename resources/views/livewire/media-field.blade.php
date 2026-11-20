@@ -130,5 +130,5 @@
     @elseif ($pageId === null && ! $disabled)
         <p class="text-muted-foreground text-sm">{{ __($isImages ? 'lynx-media::admin.save_first_images' : 'lynx-media::admin.save_first_files') }}</p>
     @endif
-    @error('uploads') <p role="alert" class="text-destructive text-sm">{{ $message }}</p> @enderror
+    @error('uploads') <p data-error-for="uploads" role="alert" class="text-destructive text-sm">{{ $message }}</p> @enderror
 </div>
