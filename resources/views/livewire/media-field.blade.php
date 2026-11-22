@@ -27,7 +27,7 @@
                     @endif
                     <div class="grid gap-1 p-2 text-xs">
                         <span class="truncate font-medium" title="{{ basename((string) $item['file']) }}">{{ basename((string) $item['file']) }}</span>
-                        <span class="text-muted-foreground">{{ $isImages ? ($item['width'] ?? 0).' × '.($item['height'] ?? 0).' · ' : '' }}{{ \Illuminate\Support\Number::fileSize((int) ($item['bytes'] ?? 0)) }}</span>
+                        <span class="text-muted-foreground">{{ $isImages ? ($item['width'] ?? 0).' × '.($item['height'] ?? 0).' · ' : '' }}{{ \LynxCms\Core\Support\LocalizedNumber::fileSize((int) ($item['bytes'] ?? 0)) }}</span>
                         @unless ($disabled)
                             <span class="flex flex-wrap gap-2">
                                 <button type="button" class="text-primary underline-offset-4 hover:underline" wire:click="$set('editing', {{ ($editing === $item['key']) ? 'null' : Js::from($item['key']) }})">{{ __($editing === $item['key'] ? 'lynx-media::admin.close' : 'lynx-media::admin.edit') }}</button>
