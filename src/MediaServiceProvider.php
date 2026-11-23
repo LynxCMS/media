@@ -6,11 +6,11 @@ namespace LynxCms\Media;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use LynxCms\Admin\AdminServiceProvider;
 use LynxCms\Core\Actions\ActionRegistry;
+use LynxCms\Core\Actions\Runner\EventMuting;
 use LynxCms\Core\Content\PageFiles;
 use LynxCms\Core\Doctor\DoctorChecks;
 use LynxCms\Core\Events\PageDeleted;
@@ -53,7 +53,7 @@ final class MediaServiceProvider extends ServiceProvider
     {
         $this->app->make(FieldTypeRegistry::class)->register(ImagesType::class, FilesType::class);
         $this->app->make(ActionRegistry::class)->register(StoreMedia::class, PruneMedia::class);
-        Event::listen(PageDeleted::class, DeleteMediaFolders::class);
+        $this->app->make(EventMuting::class)->upkeep(PageDeleted::class, DeleteMediaFolders::class);
         $this->app->make(DoctorChecks::class)->add(StorageLink::class);
         // Private fields' files (ADR-0077): before Lynx's catch-all page route.
         Route::get('lynx-media/{page}/{file}', ServePrivateMedia::class)->middleware('web')
