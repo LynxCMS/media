@@ -44,7 +44,7 @@ final class FileTypes
             $refused = array_intersect(explode(' ', Value::string($value)), self::NEVER);
 
             if ($refused !== []) {
-                $fail('Files of type ['.implode(', ', $refused).'] can run code on your site, so a field can never allow them.');
+                $fail(Value::string(__('lynx-media::validation.never', ['types' => implode(', ', $refused)])));
             }
         };
     }

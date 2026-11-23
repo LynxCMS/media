@@ -85,7 +85,7 @@ final class StoreMedia extends Action
      */
     public function handle(Input $input, ActionContext $context): array
     {
-        $page = lynx()->pages->get(Value::string($input->get('page'))) ?? throw ValidationException::withMessages(['page' => 'The page does not exist.']);
+        $page = lynx()->pages->get(Value::string($input->get('page'))) ?? throw ValidationException::withMessages(['page' => Value::string(__('lynx-media::validation.page'))]);
         $context->authorize('pages.edit', $page);
         $field = $this->mediaField($page, (string) $input->string('field'));
         $type = $field->fieldType();
@@ -96,11 +96,11 @@ final class StoreMedia extends Action
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
         if (! in_array($extension, $type->extensions($settings), true)) {
-            throw ValidationException::withMessages(['filename' => "Files of type [{$extension}] are not allowed here. Allowed: ".implode(', ', $type->extensions($settings)).'.']);
+            throw ValidationException::withMessages(['filename' => Value::string(__('lynx-media::validation.type', ['type' => $extension, 'types' => implode(', ', $type->extensions($settings))]))]);
         }
 
         if (strlen($contents) > $maxBytes) {
-            throw ValidationException::withMessages(['file' => 'The file is larger than this field allows.']);
+            throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.too_large'))]);
         }
 
         $entry = $type instanceof ImagesType ? $this->image($contents, $settings) : ['contents' => $contents, 'mime' => (string) new finfo(FILEINFO_MIME_TYPE)->buffer($contents)];
@@ -138,7 +138,7 @@ final class StoreMedia extends Action
             }
         }
 
-        throw ValidationException::withMessages(['field' => "Template [{$page->template()->name}] has no images or files field [{$name}]."]);
+        throw ValidationException::withMessages(['field' => Value::string(__('lynx-media::validation.field', ['template' => $page->template()->name, 'field' => $name]))]);
     }
 
     /**
@@ -157,7 +157,7 @@ final class StoreMedia extends Action
         $decoded = base64_decode(Value::string($input->get('base64')), true);
 
         if ($decoded === false || $decoded === '' || $name === '') {
-            throw ValidationException::withMessages(['base64' => 'Give a url, or base64 content with a filename.']);
+            throw ValidationException::withMessages(['base64' => Value::string(__('lynx-media::validation.source'))]);
         }
 
         return [$decoded, $name];
@@ -176,18 +176,18 @@ final class StoreMedia extends Action
         $declared = @getimagesizefromstring($contents);
 
         if ($declared !== false && $declared[0] * $declared[1] > self::MAX_PIXELS) {
-            throw ValidationException::withMessages(['file' => 'The image is too large to process ('.$declared[0].' × '.$declared[1].').']);
+            throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.pixels', ['width' => $declared[0], 'height' => $declared[1]]))]);
         }
 
         try {
             $image = Image::fromBytes($contents)->orient();
             [$width, $height] = [$image->width(), $image->height()];
         } catch (Throwable) {
-            throw ValidationException::withMessages(['file' => 'This is not an image Lynx can read.']);
+            throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.unreadable'))]);
         }
 
         if ($width < Value::int($settings['min_width'] ?? 0) || $height < Value::int($settings['min_height'] ?? 0)) {
-            throw ValidationException::withMessages(['file' => 'The image is smaller than this field allows ('.Value::int($settings['min_width'] ?? 0).' × '.Value::int($settings['min_height'] ?? 0).').']);
+            throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.too_small', ['width' => Value::int($settings['min_width'] ?? 0), 'height' => Value::int($settings['min_height'] ?? 0)]))]);
         }
 
         $maxWidth = Value::int($settings['max_width'] ?? self::DEFAULT_MAX_SIDE, self::DEFAULT_MAX_SIDE);

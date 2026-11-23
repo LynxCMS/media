@@ -76,7 +76,7 @@ final readonly class RemoteFile
         try {
             return Http::timeout(self::TIMEOUT_SECONDS)->withOptions($options)->get($url);
         } catch (Throwable $exception) {
-            throw $isTooLarge ? $this->tooLarge() : $this->refuse("The file at [{$url}] could not be downloaded.", $exception);
+            throw $isTooLarge ? $this->tooLarge() : $this->refuse(Value::string(__('lynx-media::validation.download.failed', ['url' => $url])), $exception);
         }
     }
 
@@ -91,7 +91,7 @@ final readonly class RemoteFile
         $host = strtolower(trim(Value::string($parts['host'] ?? ''), '[]'));
 
         if (! isset(self::DEFAULT_PORTS[$scheme]) || $host === '') {
-            throw $this->refuse("Only http and https URLs can be downloaded, not [{$url}].");
+            throw $this->refuse(Value::string(__('lynx-media::validation.download.scheme', ['url' => $url])));
         }
 
         if (in_array($host, Value::strings(config('lynx-media.downloads.allowed_hosts', [])), true)) {
@@ -102,7 +102,7 @@ final readonly class RemoteFile
         $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->resolver->addresses($host);
 
         if ($port !== self::DEFAULT_PORTS[$scheme] || $addresses === [] || ! array_all($addresses, PublicAddress::is(...))) {
-            throw $this->refuse("The file at [{$url}] is not on a public web server, so it cannot be downloaded.");
+            throw $this->refuse(Value::string(__('lynx-media::validation.download.private', ['url' => $url])));
         }
 
         $address = $addresses[0];
@@ -113,7 +113,7 @@ final readonly class RemoteFile
     private function body(Response $response, string $url, int $maxBytes): string
     {
         if (! $response->successful()) {
-            throw $this->refuse("The file at [{$url}] could not be downloaded (HTTP {$response->status()}).");
+            throw $this->refuse(Value::string(__('lynx-media::validation.download.status', ['url' => $url, 'status' => $response->status()])));
         }
 
         $contents = $response->body();
@@ -127,7 +127,7 @@ final readonly class RemoteFile
 
     private function tooLarge(): ValidationException
     {
-        return ValidationException::withMessages(['file' => 'The file is larger than this field allows.']);
+        return ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.too_large'))]);
     }
 
     private function refuse(string $message, ?Throwable $cause = null): ValidationException

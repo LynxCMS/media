@@ -129,7 +129,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         $max = Value::int($settings['max_files'] ?? 0);
 
         if ($max > 0 && count($items) > $max) {
-            $errors[''] = $max === 1 ? 'Only one file is allowed.' : "At most {$max} files are allowed.";
+            $errors[''] = trans_choice('lynx-media::validation.max_files', $max);
         }
 
         if ($errors !== []) {
@@ -153,7 +153,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         $file = Value::string($values['file'] ?? '');
 
         if (preg_match('/^\d+\/(?!\.)[A-Za-z0-9._-]+$/', $file) !== 1) {
-            $errors["{$index}.file"] = 'Each file needs its stored name, such as "42/photo.jpg" (media.store returns it).';
+            $errors["{$index}.file"] = Value::string(__('lynx-media::validation.stored_name'));
         }
 
         $key = Value::string($raw['key'] ?? '');
@@ -251,7 +251,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         $allowed = Value::strings($settings['tags'] ?? []);
 
         foreach ($allowed === [] ? [] : array_diff($clean, $allowed) as $tag) {
-            $errors[$key] = "Tag [{$tag}] is not one of: ".implode(', ', $allowed).'.';
+            $errors[$key] = Value::string(__('lynx-media::validation.tag', ['tag' => $tag, 'tags' => implode(', ', $allowed)]));
         }
 
         return $clean;
@@ -271,7 +271,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
 
         foreach ($map as $code => $text) {
             if ($languages->find((string) $code) === null) {
-                $errors["{$key}.{$code}"] = "There is no language [{$code}].";
+                $errors["{$key}.{$code}"] = Value::string(__('lynx::validation.language.missing', ['language' => $code]));
             } elseif (trim(Value::string($text)) !== '') {
                 $clean[(string) $code] = mb_substr(trim(Value::string($text)), 0, 1000);
             }
