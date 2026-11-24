@@ -23,7 +23,9 @@ use LynxCms\Media\Fields\MediaFieldType;
 /**
  * An images or files field in the page editor (ADR-0046): drop or pick files, which media.store
  * writes right away; sort, switch off, remove, describe per language, tag and set the focus point.
- * The page's value changes when the editor saves; files never saved are pruned later.
+ * With a file per language (ADR-0150), a tab per language holds the language's own files and the
+ * files every language shares, each group with its own upload zone. The page's value changes when the editor
+ * saves; files never saved are pruned later.
  *
  * @internal
  */
@@ -50,21 +52,43 @@ final class MediaField extends Component
     /** The file whose details are open, by key. */
     public ?string $editing = null;
 
+    /** With a file per language: the language tab shown (its code). */
+    public string $language = '';
+
+    /** @var list<TemporaryUploadedFile> files for every language, uploaded in a per-language field's shared group */
+    public array $sharedUploads = [];
+
     public function boot(AdminAccess $access): void
     {
         $access->authorizeScreen();
     }
 
-    /** Livewire hook: store each upload through media.store and add it to the field. */
+    /** Livewire hook: store each upload through media.store and add it to the field, in the tab's language when it has one. */
     public function updatedUploads(): void
+    {
+        $this->store($this->uploads, $this->language === '' ? null : $this->language, 'uploads');
+        $this->uploads = [];
+    }
+
+    /** Livewire hook: files every language shares, in a per-language field (ADR-0150). */
+    public function updatedSharedUploads(): void
+    {
+        $this->store($this->sharedUploads, null, 'sharedUploads');
+        $this->sharedUploads = [];
+    }
+
+    /**
+     * @param  list<TemporaryUploadedFile>  $uploads
+     */
+    private function store(array $uploads, ?string $language, string $errorKey): void
     {
         abort_if($this->disabled || $this->pageId === null, 403);
 
-        foreach ($this->uploads as $upload) {
+        foreach ($uploads as $upload) {
             $contents = $upload->get();
 
             if ($contents === false) {
-                $this->addError('uploads', __('lynx-media::admin.unreadable', ['file' => $upload->getClientOriginalName()]));
+                $this->addError($errorKey, __('lynx-media::admin.unreadable', ['file' => $upload->getClientOriginalName()]));
 
                 continue;
             }
@@ -76,14 +100,13 @@ final class MediaField extends Component
                     // The contents, never a path: no caller of media.store names a file on the server.
                     'base64' => base64_encode($contents),
                     'filename' => $upload->getClientOriginalName(),
+                    'language' => $language,
                 ])->value;
                 $this->items[] = Value::map(Value::list(app(MediaConverter::class)->toForm([['key' => (string) Str::ulid(), 'values' => $values]]))[0] ?? []);
             } catch (ValidationException $exception) {
-                $this->addError('uploads', $upload->getClientOriginalName().': '.Value::string(collect($exception->errors())->flatten()->first()));
+                $this->addError($errorKey, $upload->getClientOriginalName().': '.Value::string(collect($exception->errors())->flatten()->first()));
             }
         }
-
-        $this->uploads = [];
     }
 
     public function toggle(int $index): void
@@ -101,6 +124,7 @@ final class MediaField extends Component
     /** wire:sort handler: a file key dropped at a 0-based position. */
     public function sort(string $key, int|string $position): void
     {
+        $position = $this->fullPosition(Value::int($position), $key);
         $moving = array_values(array_filter($this->items, fn (array $item): bool => ($item['key'] ?? null) === $key));
         $rest = array_values(array_filter($this->items, fn (array $item): bool => ($item['key'] ?? null) !== $key));
         array_splice($rest, max(0, min(count($rest), Value::int($position))), 0, $moving);
@@ -132,15 +156,71 @@ final class MediaField extends Component
         $type = $definition->fieldType();
         $settings = $definition->config();
         $max = Value::int($settings['max_files'] ?? 0);
+        $isPerLanguage = MediaFieldType::isPerLanguage($settings) && count(LocalizedForm::languages()) > 1;
+
+        if ($isPerLanguage && $this->language === '') {
+            $this->language = (string) lynx()->languages->default()->code;
+        }
+
+        // max_files counts per language: the tab's language's own files, and the shared ones.
+        $count = fn (string $language): int => count(array_filter($this->items, fn (array $item): bool => Value::string($item['language'] ?? '') === $language));
+        $canUpload = ! $this->disabled && $this->pageId !== null;
 
         return view('lynx-media::livewire.media-field', [
             'isImages' => $type instanceof ImagesType,
             'accept' => $type instanceof MediaFieldType ? implode(',', array_map(fn (string $e): string => '.'.$e, $type->extensions($settings))) : '',
-            'canAdd' => ! $this->disabled && $this->pageId !== null && ($max === 0 || count($this->items) < $max),
+            'canAdd' => $canUpload && ($max === 0 || ($isPerLanguage ? $count($this->language) : count($this->items)) < $max),
+            'canAddShared' => $canUpload && ($max === 0 || $count('') < $max),
+            'isPerLanguage' => $isPerLanguage,
+            'fallsBackTo' => $isPerLanguage ? $this->fallsBackTo($definition->fallbackMode() !== 'none') : null,
             'multiple' => $max !== 1,
             'languages' => LocalizedForm::languages(),
             'allowedTags' => Value::strings($settings['tags'] ?? []),
             'field' => $definition,
         ]);
+    }
+
+    /**
+     * The position among every file of a drop at a position in its group (a per-language field
+     * lists a language's files and the shared ones apart): just before the file of the group shown
+     * there, or after its last.
+     */
+    private function fullPosition(int $position, string $moving): int
+    {
+        $language = Value::string(collect($this->items)->firstWhere('key', $moving)['language'] ?? '');
+        $shown = array_values(array_filter($this->items, fn (array $item): bool => Value::string($item['language'] ?? '') === $language && ($item['key'] ?? null) !== $moving));
+        $rest = array_values(array_filter($this->items, fn (array $item): bool => ($item['key'] ?? null) !== $moving));
+        $anchor = $shown[$position]['key'] ?? null;
+
+        foreach ($rest as $index => $item) {
+            if (($item['key'] ?? null) === $anchor) {
+                return $index;
+            }
+        }
+
+        $last = end($shown);
+
+        return $last === false ? count($rest) : (int) array_search($last, $rest, true) + 1;
+    }
+
+    /**
+     * In a language's tab without files of its own: the language whose files visitors see instead
+     * when no file is shared either (ADR-0150), or "" when they see none. Null with files of its own.
+     */
+    private function fallsBackTo(bool $fallsBack): ?string
+    {
+        $has = fn (string $code): bool => array_any($this->items, fn (array $item): bool => Value::string($item['language'] ?? '') === $code);
+
+        if ($has($this->language)) {
+            return null;
+        }
+
+        foreach ($fallsBack ? array_slice(lynx()->languages->chain($this->language), 1) : [] as $step) {
+            if ($has((string) $step->code)) {
+                return $step->tabLabel();
+            }
+        }
+
+        return '';
     }
 }

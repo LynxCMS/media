@@ -36,6 +36,7 @@ final class MediaConverter implements FormConverter, PreparesDisplay
                 'mime' => Value::string($values['mime'] ?? ''),
                 'focus' => Value::map($values['focus'] ?? ['x' => 50, 'y' => 50, 'zoom' => 0]),
                 'tags' => implode(', ', Value::strings($values['tags'] ?? [])),
+                'language' => Value::string($values['language'] ?? ''),
                 'description' => array_map(fn (string $code): string => Value::string($description[$code] ?? ''), array_combine($codes, $codes)),
             ];
         }
@@ -57,6 +58,7 @@ final class MediaConverter implements FormConverter, PreparesDisplay
                 'mime' => Value::string($item['mime'] ?? ''),
                 'focus' => Value::map($item['focus'] ?? []),
                 'tags' => array_values(array_filter(array_map(trim(...), explode(',', Value::string($item['tags'] ?? ''))))),
+                'language' => Value::string($item['language'] ?? ''),
                 'description' => array_filter(Value::map($item['description'] ?? []), fn (mixed $text): bool => trim(Value::string($text)) !== ''),
             ], fn (mixed $v): bool => ! in_array($v, [[], '', 0], true));
             $items[] = ['key' => Value::string($item['key'] ?? ''), 'enabled' => (bool) ($item['enabled'] ?? true), 'values' => $values];

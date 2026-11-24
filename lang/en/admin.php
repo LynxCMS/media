@@ -27,4 +27,12 @@ return [
     'save_first_images' => 'Save the page first, then add images.',
     'save_first_files' => 'Save the page first, then add files.',
     'unreadable' => ':file: the upload could not be read. Try again.',
+    'every_language' => 'Shared by every language',
+    'language' => 'Language',
+    'no_language_file' => 'No file for this language. Visitors see none.',
+    'falls_back_to' => 'No file for this language. Visitors see the :language files.',
+    'language_files' => '{1} :language file|[0,*] :language files',
+    'language_images' => '{1} :language image|[0,*] :language images',
+    'shared_files' => 'Shared by every language',
+    'uses_shared' => 'No file for this language yet. Visitors see the shared files.',
 ];

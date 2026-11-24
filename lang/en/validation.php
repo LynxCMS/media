@@ -21,4 +21,5 @@ return [
     'max_files' => 'Only one file is allowed.|At most :count files are allowed.',
     'stored_name' => 'Each file needs its stored name, such as "42/photo.jpg" (media.store returns it).',
     'tag' => 'Tag [:tag] is not one of: :tags.',
+    'language' => 'There is no language [:language] on this site.',
 ];

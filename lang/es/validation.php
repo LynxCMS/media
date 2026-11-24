@@ -21,4 +21,5 @@ return [
     'max_files' => 'Solo se permite un archivo.|Se permiten como máximo :count archivos.',
     'stored_name' => 'Cada archivo necesita el nombre con el que se guardó, como "42/photo.jpg" (media.store lo devuelve).',
     'tag' => 'La etiqueta [:tag] no es una de estas: :tags.',
+    'language' => 'Este sitio no tiene el idioma [:language].',
 ];

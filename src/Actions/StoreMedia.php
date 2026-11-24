@@ -66,6 +66,7 @@ final class StoreMedia extends Action
             'url' => ['sometimes', 'nullable', 'url'],
             'base64' => ['sometimes', 'nullable', 'string'],
             'filename' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'language' => ['sometimes', 'nullable', 'string', 'max:32'],
         ];
     }
 
@@ -77,6 +78,7 @@ final class StoreMedia extends Action
             'url' => $schema->string()->description('Download the file from this URL, on a public web server (http or https).'),
             'base64' => $schema->string()->description('Or the file\'s content, base64 encoded.'),
             'filename' => $schema->string()->description('Name to store it under, e.g. "poster.jpg". Defaults to the URL\'s name.'),
+            'language' => $schema->string()->description('For a field with a file per language: the language code the file is for. Leave it out for every language.'),
         ];
     }
 
@@ -105,7 +107,7 @@ final class StoreMedia extends Action
 
         $entry = $type instanceof ImagesType ? $this->image($contents, $settings) : ['contents' => $contents, 'mime' => (string) new finfo(FILEINFO_MIME_TYPE)->buffer($contents)];
         $file = $page->id.'/'.Str::slug(pathinfo($name, PATHINFO_FILENAME)).'-'.Str::lower(Str::random(6)).'.'.($extension === 'jpeg' ? 'jpg' : $extension);
-        $values = ['file' => $file, 'bytes' => strlen(Value::string($entry['contents'])), 'mime' => $entry['mime']] + array_diff_key($entry, ['contents' => true, 'mime' => true]);
+        $values = ['file' => $file, 'bytes' => strlen(Value::string($entry['contents'])), 'mime' => $entry['mime']] + array_diff_key($entry, ['contents' => true, 'mime' => true]) + $this->language($input);
 
         if (! $context->dryRun) {
             $path = $this->paths->path($file);
@@ -117,6 +119,22 @@ final class StoreMedia extends Action
         $context->changes->created('file', $file, "Store {$file} for {$field->name} on page {$page->name()}", $values);
 
         return $values;
+    }
+
+    /**
+     * The language the file is for (ADR-0150), when one is given.
+     *
+     * @return array{language?: string}
+     */
+    private function language(Input $input): array
+    {
+        $code = trim((string) $input->string('language'));
+
+        if ($code === '') {
+            return [];
+        }
+
+        return lynx()->languages->find($code) !== null ? ['language' => $code] : throw ValidationException::withMessages(['language' => Value::string(__('lynx-media::validation.language', ['language' => $code]))]);
     }
 
     /** A media field of the page's template, or a media subfield of one of its repeaters or matrices. */

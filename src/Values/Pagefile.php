@@ -74,6 +74,14 @@ class Pagefile implements Stringable
         return Value::string($this->values['mime'] ?? '');
     }
 
+    /** The language the file is for (a field with a file per language, ADR-0150), or null for every language. */
+    public function language(): ?string
+    {
+        $language = $this->values['language'] ?? null;
+
+        return is_string($language) && $language !== '' ? $language : null;
+    }
+
     public function description(): string
     {
         return LocalizedText::from($this->values['description'] ?? [])->in();

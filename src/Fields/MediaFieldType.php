@@ -20,6 +20,7 @@ use LynxCms\Core\Languages\LanguageRegistry;
 use LynxCms\Core\Models\Field;
 use LynxCms\Core\Support\Value;
 use LynxCms\Media\MediaPaths;
+use LynxCms\Media\Values\MediaLanguages;
 use LynxCms\Media\Values\MediaList;
 use LynxCms\Media\Values\Pagefile;
 
@@ -44,6 +45,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'mime' => new ItemProperty(Comparison::Text),
             'bytes' => new ItemProperty(Comparison::Integer),
             'tags' => new ItemProperty(Comparison::Text, isList: true),
+            'language' => new ItemProperty(Comparison::Text),
             'description' => new ItemProperty(Comparison::Text, isTranslatable: true),
         ];
     }
@@ -74,6 +76,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'max_kb' => $schema->integer()->description('Largest upload in kilobytes. Default 10240.'),
             'tags' => $schema->array()->items($schema->string())->description('Tags editors may choose; empty allows any tag.'),
             'private' => $schema->boolean()->description('Keep the files private: stored off the public disk and served only to visitors who may open the page. Switching moves existing files.'),
+            'per_language' => $schema->boolean()->description('A file per language: each file has a language (or none for every language), and templates read the current language\'s files with fallback (ADR-0150). max_files counts per language.'),
         ];
     }
 
@@ -86,6 +89,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'tags' => ['sometimes', 'array'],
             'tags.*' => ['string', 'max:64'],
             'private' => ['sometimes', 'boolean'],
+            'per_language' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -97,6 +101,54 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
     public static function isPrivate(array $settings): bool
     {
         return (bool) ($settings['private'] ?? false);
+    }
+
+    /**
+     * Whether each file has a language (ADR-0150).
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    public static function isPerLanguage(array $settings): bool
+    {
+        return (bool) ($settings['per_language'] ?? false);
+    }
+
+    /**
+     * The most files one language reads: all of them, or with a file per language, the largest
+     * group of one language's files, or of the files for every language.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @param  array<string, mixed>  $settings
+     */
+    private function mostFilesInOneLanguage(array $items, array $settings): int
+    {
+        if (! self::isPerLanguage($settings)) {
+            return count($items);
+        }
+
+        $groups = array_count_values(array_map(fn (array $item): string => Value::string(Value::map($item['values'] ?? [])['language'] ?? ''), $items));
+
+        return $groups === [] ? 0 : max($groups);
+    }
+
+    /**
+     * A file's language: a code the site has, or null for every language.
+     *
+     * @param  array<string, string>  $errors
+     */
+    private function language(mixed $language, string $key, array &$errors): ?string
+    {
+        $code = trim(Value::string($language));
+
+        if ($code === '') {
+            return null;
+        }
+
+        if (lynx()->languages->find($code) === null) {
+            $errors[$key] = Value::string(__('lynx-media::validation.language', ['language' => $code]));
+        }
+
+        return $code;
     }
 
     public function subfields(array $settings, ?string $type): array
@@ -128,7 +180,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
 
         $max = Value::int($settings['max_files'] ?? 0);
 
-        if ($max > 0 && count($items) > $max) {
+        if ($max > 0 && $this->mostFilesInOneLanguage($items, $settings) > $max) {
             $errors[''] = trans_choice('lynx-media::validation.max_files', $max);
         }
 
@@ -169,6 +221,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
                 'mime' => Value::string($values['mime'] ?? ''),
                 'tags' => $this->cleanTags($values['tags'] ?? [], $settings, "{$index}.tags", $errors),
                 'description' => $this->descriptions($values['description'] ?? null, "{$index}.description", $errors),
+                'language' => $this->language($values['language'] ?? null, "{$index}.language", $errors),
             ] + $this->details($values, $index, $normalizer), fn (mixed $v): bool => ! in_array($v, [[], '', null], true)),
         ];
     }
@@ -214,6 +267,11 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             if ((bool) ($item['enabled'] ?? true)) {
                 $files[] = $this->file(Value::string($item['key'] ?? ''), ['private' => self::isPrivate($field->config())] + Value::map($item['values'] ?? []));
             }
+        }
+
+        // A file per language: the current language's files, with fallback (ADR-0150).
+        if (self::isPerLanguage($field->config())) {
+            $files = MediaLanguages::forLanguage($files, null, $field->fallbackMode() !== 'none');
         }
 
         return Value::int($field->config()['max_files'] ?? 0) === 1 ? ($files[0] ?? null) : new MediaList($files);

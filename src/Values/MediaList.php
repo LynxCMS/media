@@ -7,7 +7,6 @@ namespace LynxCms\Media\Values;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use LynxCms\Core\Models\Language;
 use Traversable;
 
 /**
@@ -61,24 +60,15 @@ final readonly class MediaList implements Countable, IteratorAggregate
     }
 
     /**
-     * Files tagged with a language code: the current language's (or $language's), else those of the
-     * next language along its fallback chain, else the files tagged with no language at all.
+     * The files of the current language (or $language's): those with that language, or tagged with
+     * its code, else those of the next language along its fallback chain, else the files for every
+     * language (ADR-0046, ADR-0150).
      *
      * @return self<T>
      */
     public function inLanguage(?string $language = null): self
     {
-        foreach (lynx()->languages->chain($language) as $step) {
-            $tagged = $this->tagged((string) $step->code);
-
-            if ($tagged !== []) {
-                return new self($tagged);
-            }
-        }
-
-        $codes = lynx()->languages->all()->map(fn (Language $language): string => (string) $language->code)->all();
-
-        return new self(array_values(array_filter($this->files, fn (Pagefile $file): bool => array_intersect($codes, $file->tags()) === [])));
+        return new self(MediaLanguages::firstAlongChain($this->files, $language));
     }
 
     public function isEmpty(): bool

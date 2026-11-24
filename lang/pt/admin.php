@@ -27,4 +27,12 @@ return [
     'save_first_images' => 'Guarde primeiro a página e depois adicione imagens.',
     'save_first_files' => 'Guarde primeiro a página e depois adicione ficheiros.',
     'unreadable' => ':file: não foi possível ler o carregamento. Tente novamente.',
+    'every_language' => 'Partilhado por todas as línguas',
+    'language' => 'Língua',
+    'no_language_file' => 'Nenhum ficheiro para esta língua. Os visitantes não veem nenhum.',
+    'falls_back_to' => 'Nenhum ficheiro para esta língua. Os visitantes veem os ficheiros de :language.',
+    'language_files' => '{1} Ficheiro em :language|[0,*] Ficheiros em :language',
+    'language_images' => '{1} Imagem em :language|[0,*] Imagens em :language',
+    'shared_files' => 'Partilhados por todas as línguas',
+    'uses_shared' => 'Ainda não há ficheiro para esta língua. Os visitantes veem os partilhados.',
 ];
