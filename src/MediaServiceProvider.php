@@ -20,6 +20,7 @@ use LynxCms\Media\Actions\StoreMedia;
 use LynxCms\Media\Admin\AdminIntegration;
 use LynxCms\Media\Console\PruneMediaCommand;
 use LynxCms\Media\Console\PullMediaCommand;
+use LynxCms\Media\Doctor\QueuedSizes;
 use LynxCms\Media\Doctor\StorageLink;
 use LynxCms\Media\Downloads\DnsHostResolver;
 use LynxCms\Media\Downloads\HostResolver;
@@ -28,6 +29,7 @@ use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Http\ServePrivateMedia;
 use LynxCms\Media\Http\ServeRemoteMedia;
 use LynxCms\Media\Http\ServeSignedMedia;
+use LynxCms\Media\Images\SizeQueue;
 use LynxCms\Media\View\ImageComponent;
 
 /**
@@ -44,6 +46,8 @@ final class MediaServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(self::ROOT.'/config/lynx-media.php', 'lynx-media');
         $this->app->singleton(MediaPaths::class);
+        // Lists each media folder once per request (lynx-media.queue_sizes).
+        $this->app->scoped(SizeQueue::class);
         $this->app->singleton(HostResolver::class, DnsHostResolver::class);
         $this->app->singleton(MovePrivateMedia::class);
         $this->app->singleton(PageFiles::class, MediaPageFiles::class);
@@ -55,6 +59,7 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->make(ActionRegistry::class)->register(StoreMedia::class, PruneMedia::class);
         $this->app->make(EventMuting::class)->upkeep(PageDeleted::class, DeleteMediaFolders::class);
         $this->app->make(DoctorChecks::class)->add(StorageLink::class);
+        $this->app->make(DoctorChecks::class)->add(QueuedSizes::class);
         // Private fields' files (ADR-0077): before Lynx's catch-all page route.
         Route::get('lynx-media/{page}/{file}', ServePrivateMedia::class)->middleware('web')
             ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media');

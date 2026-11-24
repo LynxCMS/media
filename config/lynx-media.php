@@ -44,6 +44,13 @@ return [
     'quality' => (int) env('LYNX_MEDIA_QUALITY', 82),
 
     /*
+    | Image sizes made by queued jobs instead of during the page's render (one job per size): a
+    | page shows the nearest image that exists until its size is made, and stays out of the page
+    | cache until then. Needs a queue worker; off, sizes are made as the page first prints them.
+    */
+    'queue_sizes' => (bool) env('LYNX_MEDIA_QUEUE_SIZES', false),
+
+    /*
     | Named sizes for $image->preset('card'): [width, height] (0 keeps the aspect ratio).
     */
     'presets' => [

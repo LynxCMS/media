@@ -39,8 +39,13 @@ final class ImageComponent extends Component
             $srcset = array_values(array_unique(array_map(fn (float $step): int => max(1, (int) round($shown->width() * $step)), self::SRCSET_STEPS)));
         }
 
+        $isCrop = $image !== null && $this->width !== null && $this->height !== null;
+
         return view('lynx-media::components.image', [
             'shown' => $shown,
+            // A crop fills its box at the focus point, so an image shown while its size is made
+            // in a queue (lynx-media.queue_sizes) is cropped by the browser at the same place.
+            'cropStyle' => $isCrop ? 'object-fit: cover; object-position: '.$image->focus()['x'].'% '.$image->focus()['y'].'%' : null,
             'srcset' => $image !== null && $srcset !== [] ? $image->srcset($srcset) : null,
             'altText' => $this->alt ?? $image?->description() ?? '',
         ]);

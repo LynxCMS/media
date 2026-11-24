@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LynxCms\Media\Values;
 
 use LynxCms\Core\Support\Value;
+use LynxCms\Media\Images\SizeQueue;
 use LynxCms\Media\Images\Variations;
 use Override;
 
@@ -62,7 +63,28 @@ final class Pageimage extends Pagefile
         return is_array($source) ? new self($this->key, Value::map($source)) : $this;
     }
 
-    /** The stored name; a variation's file is made here, on first use. */
+    /**
+     * The file's URL. A variation's file is made here on first use, or, with lynx-media.queue_sizes
+     * on, queued while the URL of the nearest image that exists is returned (SizeQueue).
+     */
+    #[Override]
+    public function url(): string
+    {
+        if (isset($this->values['variation']) && SizeQueue::isOn()) {
+            $queue = app(SizeQueue::class);
+            $file = parent::file();
+
+            if (! $queue->exists($file, $this->isPrivate())) {
+                $original = $this->original();
+
+                return $queue->queue($original, $original->values, $file, $this->spec(), $this->width(), $this->height());
+            }
+        }
+
+        return parent::url();
+    }
+
+    /** The stored name; a variation's file is made here, on first use, for code that reads it. */
     #[Override]
     public function file(): string
     {

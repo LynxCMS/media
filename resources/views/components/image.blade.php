@@ -3,5 +3,5 @@
     @if ($srcset) srcset="{{ $srcset }}" @endif
     @if ($sizes) sizes="{{ $sizes }}" @endif
     @if ($lazy) loading="lazy" decoding="async" @endif
-    {{ $attributes }}>
+    {{ $cropStyle !== null ? $attributes->merge(['style' => $cropStyle]) : $attributes }}>
 @endif
