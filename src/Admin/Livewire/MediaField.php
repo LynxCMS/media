@@ -19,6 +19,7 @@ use LynxCms\Media\Actions\StoreMedia;
 use LynxCms\Media\Admin\MediaConverter;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Fields\MediaFieldType;
+use LynxCms\Media\Images\ImageLimits;
 
 /**
  * An images or files field in the page editor (ADR-0046): drop or pick files, which media.store
@@ -166,8 +167,12 @@ final class MediaField extends Component
         $count = fn (string $language): int => count(array_filter($this->items, fn (array $item): bool => Value::string($item['language'] ?? '') === $language));
         $canUpload = ! $this->disabled && $this->pageId !== null;
 
+        [$maxWidth, $maxHeight] = ImageLimits::maxSides($settings);
+
         return view('lynx-media::livewire.media-field', [
             'isImages' => $type instanceof ImagesType,
+            // Images larger than the field keeps are scaled down in the browser before uploading.
+            'shrink' => $type instanceof ImagesType ? ['maxWidth' => $maxWidth, 'maxHeight' => $maxHeight, 'quality' => ImageLimits::quality()] : null,
             'accept' => $type instanceof MediaFieldType ? implode(',', array_map(fn (string $e): string => '.'.$e, $type->extensions($settings))) : '',
             'canAdd' => $canUpload && ($max === 0 || ($isPerLanguage ? $count($this->language) : count($this->items)) < $max),
             'canAddShared' => $canUpload && ($max === 0 || $count('') < $max),

@@ -20,6 +20,7 @@ use LynxCms\Core\Support\Value;
 use LynxCms\Media\Downloads\RemoteFile;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Fields\MediaFieldType;
+use LynxCms\Media\Images\ImageLimits;
 use LynxCms\Media\MediaPaths;
 use Throwable;
 
@@ -35,8 +36,6 @@ use Throwable;
 final class StoreMedia extends Action
 {
     private const int DEFAULT_MAX_KB = 10240;
-
-    private const int DEFAULT_MAX_SIDE = 2560;
 
     /** Largest image decoded, in pixels: about 8000 × 6000. */
     private const int MAX_PIXELS = 50_000_000;
@@ -208,8 +207,7 @@ final class StoreMedia extends Action
             throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.too_small', ['width' => Value::int($settings['min_width'] ?? 0), 'height' => Value::int($settings['min_height'] ?? 0)]))]);
         }
 
-        $maxWidth = Value::int($settings['max_width'] ?? self::DEFAULT_MAX_SIDE, self::DEFAULT_MAX_SIDE);
-        $maxHeight = Value::int($settings['max_height'] ?? self::DEFAULT_MAX_SIDE, self::DEFAULT_MAX_SIDE);
+        [$maxWidth, $maxHeight] = ImageLimits::maxSides($settings);
 
         if ($width > $maxWidth || $height > $maxHeight) {
             $scale = min($maxWidth / $width, $maxHeight / $height);
