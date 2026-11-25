@@ -13,10 +13,13 @@ use Illuminate\Validation\ValidationException;
 use LynxCms\Core\Actions\Action;
 use LynxCms\Core\Actions\Runner\ActionContext;
 use LynxCms\Core\Actions\Runner\Input;
+use LynxCms\Core\Fields\FieldAccess;
 use LynxCms\Core\Fields\Items\ItemFieldType;
 use LynxCms\Core\Models\Field;
 use LynxCms\Core\Pages\Page;
+use LynxCms\Core\Pages\Saving\LockedFields;
 use LynxCms\Core\Support\Value;
+use LynxCms\Core\Templates\TemplateField;
 use LynxCms\Media\Downloads\RemoteFile;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Fields\MediaFieldType;
@@ -104,7 +107,8 @@ final class StoreMedia extends Action
     {
         $page = lynx()->pages->get(Value::string($input->get('page'))) ?? throw ValidationException::withMessages(['page' => Value::string(__('lynx-media::validation.page'))]);
         $context->authorize('pages.edit', $page);
-        $field = $this->mediaField($page, (string) $input->string('field'));
+        [$field, $owner] = $this->mediaField($page, (string) $input->string('field'));
+        $this->assertWritable($owner);
         $type = $field->fieldType();
         assert($type instanceof MediaFieldType);
         $settings = $field->config();
@@ -157,12 +161,30 @@ final class StoreMedia extends Action
     }
 
     /** A media field of the page's template, or a media subfield of one of its repeaters or matrices. */
-    private function mediaField(Page $page, string $name): Field
+    /** Refuses what pages.save would refuse for the field, before a file is written in its name. */
+    private function assertWritable(TemplateField $owner): void
     {
-        $field = $page->templateField($name)?->field;
+        if ($owner->isLocked() && ! app(LockedFields::class)->mayWrite()) {
+            throw ValidationException::withMessages(['field' => Value::string(__('lynx::validation.values.locked'))]);
+        }
 
-        if ($field instanceof Field && $field->fieldType() instanceof MediaFieldType) {
-            return $field;
+        if (! app(FieldAccess::class)->canEdit($owner->field)) {
+            throw ValidationException::withMessages(['field' => Value::string(__('lynx::validation.values.no_access'))]);
+        }
+    }
+
+    /**
+     * The media field, and the template's field that holds it: itself, or the repeater or matrix
+     * its items are in.
+     *
+     * @return array{0: Field, 1: TemplateField}
+     */
+    private function mediaField(Page $page, string $name): array
+    {
+        $templateField = $page->templateField($name);
+
+        if ($templateField instanceof TemplateField && $templateField->field->fieldType() instanceof MediaFieldType) {
+            return [$templateField->field, $templateField];
         }
 
         foreach (lynx()->templates->fields($page->template()->name) as $templateField) {
@@ -170,7 +192,7 @@ final class StoreMedia extends Action
 
             foreach ($type instanceof ItemFieldType ? $type->allSubfields($templateField->field->config()) : [] as $subfield) {
                 if ($subfield->name() === $name && $subfield->type() instanceof MediaFieldType) {
-                    return $subfield->field;
+                    return [$subfield->field, $templateField];
                 }
             }
         }
