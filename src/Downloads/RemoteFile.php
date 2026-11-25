@@ -59,14 +59,21 @@ final readonly class RemoteFile
 
     /**
      * Curl stops the transfer once more than $maxBytes arrive, whether or not the server said how
-     * many it would send.
+     * many it would send. It counts bytes on the wire, so the body is not decompressed: a few
+     * megabytes of gzip could otherwise grow past the limit in memory before it is measured.
      */
     private function request(string $url, int $maxBytes): Response
     {
+        // Without curl, Guzzle ignores the pinned address and resolves the host again after the check.
+        if (! extension_loaded('curl')) {
+            throw $this->refuse(Value::string(__('lynx-media::validation.download.failed', ['url' => $url])));
+        }
+
         $pin = $this->pin($url);
         $isTooLarge = false;
         $options = [
             'allow_redirects' => false,
+            'decode_content' => false,
             // A true answer makes Guzzle abort the transfer.
             'progress' => function (int $total, int $received) use ($maxBytes, &$isTooLarge): bool {
                 return $isTooLarge = $total > $maxBytes || $received > $maxBytes;
