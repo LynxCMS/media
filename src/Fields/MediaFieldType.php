@@ -204,8 +204,14 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         $values = Value::map($raw['values'] ?? []);
         $file = Value::string($values['file'] ?? '');
 
-        if (preg_match('/^\d+\/(?!\.)[A-Za-z0-9._-]+$/', $file) !== 1) {
+        $facts = [];
+
+        if (preg_match('/^\d+\/(?!\.)[A-Za-z0-9._-]+$/D', $file) !== 1) {
             $errors["{$index}.file"] = Value::string(__('lynx-media::validation.stored_name'));
+        } else {
+            // On a save, only this page's own files, with their real size, type and dimensions.
+            $facts = app(StoredFileCheck::class)->facts($file, self::isPrivate($settings), $this instanceof ImagesType, $this->extensions($settings));
+            $errors += is_string($facts) ? ["{$index}.file" => $facts] : [];
         }
 
         $key = Value::string($raw['key'] ?? '');
@@ -215,14 +221,14 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'type' => null,
             'enabled' => (bool) ($raw['enabled'] ?? true),
             'depth' => 0,
-            'values' => array_filter([
+            'values' => array_filter(array_replace([
                 'file' => $file,
                 'bytes' => Value::int($values['bytes'] ?? 0),
                 'mime' => Value::string($values['mime'] ?? ''),
                 'tags' => $this->cleanTags($values['tags'] ?? [], $settings, "{$index}.tags", $errors),
                 'description' => $this->descriptions($values['description'] ?? null, "{$index}.description", $errors),
                 'language' => $this->language($values['language'] ?? null, "{$index}.language", $errors),
-            ] + $this->details($values, $index, $normalizer), fn (mixed $v): bool => ! in_array($v, [[], '', null], true)),
+            ] + $this->details($values, $index, $normalizer), is_array($facts) ? $facts : []), fn (mixed $v): bool => ! in_array($v, [[], '', null], true)),
         ];
     }
 

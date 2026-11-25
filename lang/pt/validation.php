@@ -20,6 +20,10 @@ return [
     'never' => 'Os ficheiros do tipo [:types] podem executar código no seu site, por isso um campo nunca os pode permitir.',
     'max_files' => 'Só é permitido um ficheiro.|São permitidos no máximo :count ficheiros.',
     'stored_name' => 'Cada ficheiro precisa do nome com que foi guardado, como "42/photo.jpg" (media.store devolve-o).',
+    'other_page' => 'Este ficheiro pertence a outra página. Carregue-o nesta página com media.store.',
+    'stored_type' => 'O campo não permite ficheiros deste tipo.',
+    'missing_file' => 'Este ficheiro não está guardado. Carregue-o de novo com media.store.',
+    'not_image' => 'Este ficheiro não é uma imagem.',
     'tag' => 'A etiqueta [:tag] não é uma destas: :tags.',
     'language' => 'Este site não tem a língua [:language].',
 ];

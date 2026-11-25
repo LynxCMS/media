@@ -26,6 +26,7 @@ use LynxCms\Media\Downloads\DnsHostResolver;
 use LynxCms\Media\Downloads\HostResolver;
 use LynxCms\Media\Fields\FilesType;
 use LynxCms\Media\Fields\ImagesType;
+use LynxCms\Media\Fields\StoredFileCheck;
 use LynxCms\Media\Http\ServePrivateMedia;
 use LynxCms\Media\Http\ServeRemoteMedia;
 use LynxCms\Media\Http\ServeSignedMedia;
@@ -48,6 +49,7 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->singleton(MediaPaths::class);
         // Lists each media folder once per request (lynx-media.queue_sizes).
         $this->app->scoped(SizeQueue::class);
+        $this->app->scoped(StoredFileCheck::class);
         $this->app->singleton(HostResolver::class, DnsHostResolver::class);
         $this->app->singleton(MovePrivateMedia::class);
         $this->app->singleton(PageFiles::class, MediaPageFiles::class);
