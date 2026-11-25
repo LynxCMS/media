@@ -19,7 +19,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * A private field's file (ADR-0077), for whoever may open its page: staff who may view the page
  * in the admin, or a visitor when the page is published, no page gate answers instead (a password
- * form, a sign-in redirect) and the visibility rules allow it. A gate's answer is the file's answer.
+ * form, a sign-in redirect), the visibility rules allow it and the live page shows the file
+ * (PublishedFiles). A gate's answer is the file's answer.
  *
  * @internal
  */
@@ -31,6 +32,7 @@ final readonly class ServePrivateMedia
         private Publication $publication,
         private PageGates $gates,
         private PageVisibility $visibility,
+        private PublishedFiles $files,
     ) {}
 
     public function __invoke(Request $request, int $page, string $file): Response
@@ -41,7 +43,7 @@ final readonly class ServePrivateMedia
 
         abort_unless($owner instanceof Page && $disk->exists($path), 404);
 
-        $refusal = $this->refusal($owner, $request);
+        $refusal = $this->refusal($owner, $request, $file);
 
         if ($refusal !== null) {
             return $refusal;
@@ -58,7 +60,7 @@ final readonly class ServePrivateMedia
     }
 
     /** Null when the request may have the page's files, else what to answer instead. */
-    private function refusal(Page $page, Request $request): ?Response
+    private function refusal(Page $page, Request $request, string $file): ?Response
     {
         if (Gate::allows('lynx.pages.view', $page)) {
             return null;
@@ -73,6 +75,9 @@ final readonly class ServePrivateMedia
         }
 
         abort_unless($this->visibility->allows($page), 404);
+
+        // A visitor gets only the files the live page shows: not ones an editor removed or hid, nor a draft's.
+        abort_unless($this->files->names($page, $file), 404);
 
         return null;
     }
