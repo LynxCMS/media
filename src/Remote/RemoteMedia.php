@@ -22,7 +22,7 @@ use LynxCms\Media\MediaPaths;
 final readonly class RemoteMedia
 {
     /** A stored file: a page folder and a plain name that doesn't start with a dot. */
-    private const string STORED_NAME = '/^\d+\/(?!\.)[A-Za-z0-9._-]+$/';
+    private const string STORED_NAME = '/^\d+\/(?!\.)[A-Za-z0-9._-]+$/D';
 
     private const int DEFAULT_MAX_KB = 51200;
 

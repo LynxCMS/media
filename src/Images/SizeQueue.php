@@ -54,7 +54,7 @@ final class SizeQueue
     {
         $file = $original->file();
         $info = pathinfo($file);
-        $pattern = '/^'.preg_quote(Value::string($info['filename'] ?? ''), '/').'\.(\d+)x(\d+)(?:-[^.]+)?\.\w+$/';
+        $pattern = '/^'.preg_quote(Value::string($info['filename'] ?? ''), '/').'\.(\d+)x(\d+)(?:-[^.]+)?\.\w+$/D';
         $ratio = $original->width() / max(1, $original->height());
         $best = null;
 
