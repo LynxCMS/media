@@ -40,6 +40,13 @@ final class StoreMedia extends Action
     /** Largest image decoded, in pixels: about 8000 × 6000. */
     private const int MAX_PIXELS = 50_000_000;
 
+    /**
+     * Random characters at the end of a stored name. A public field's files are on the web
+     * server's disk, served without asking Lynx, so the name is what keeps an unpublished page's
+     * files from being guessed: 16 of [a-z0-9] is about 82 bits.
+     */
+    public const int SUFFIX_LENGTH = 16;
+
     /** Image types an images field stores, by getimagesize()'s type, with their extensions. */
     private const array IMAGE_TYPES = [
         IMAGETYPE_JPEG => ['jpg', 'jpeg'],
@@ -118,7 +125,7 @@ final class StoreMedia extends Action
         }
 
         $entry = $type instanceof ImagesType ? $this->image($contents, $settings) : ['contents' => $contents, 'mime' => (string) new finfo(FILEINFO_MIME_TYPE)->buffer($contents)];
-        $file = $page->id.'/'.Str::slug(pathinfo($name, PATHINFO_FILENAME)).'-'.Str::lower(Str::random(6)).'.'.($extension === 'jpeg' ? 'jpg' : $extension);
+        $file = $page->id.'/'.Str::slug(pathinfo($name, PATHINFO_FILENAME)).'-'.Str::lower(Str::random(self::SUFFIX_LENGTH)).'.'.($extension === 'jpeg' ? 'jpg' : $extension);
         $values = ['file' => $file, 'bytes' => strlen(Value::string($entry['contents'])), 'mime' => $entry['mime']] + array_diff_key($entry, ['contents' => true, 'mime' => true]) + $this->language($input);
 
         if (! $context->dryRun) {
