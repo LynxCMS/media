@@ -40,6 +40,15 @@ final class StoreMedia extends Action
     /** Largest image decoded, in pixels: about 8000 × 6000. */
     private const int MAX_PIXELS = 50_000_000;
 
+    /** Image types an images field stores, by getimagesize()'s type, with their extensions. */
+    private const array IMAGE_TYPES = [
+        IMAGETYPE_JPEG => ['jpg', 'jpeg'],
+        IMAGETYPE_PNG => ['png'],
+        IMAGETYPE_GIF => ['gif'],
+        IMAGETYPE_WEBP => ['webp'],
+        IMAGETYPE_AVIF => ['avif'],
+    ];
+
     public function __construct(private readonly MediaPaths $paths, private readonly RemoteFile $remote) {}
 
     public static function name(): string
@@ -102,6 +111,10 @@ final class StoreMedia extends Action
 
         if (strlen($contents) > $maxBytes) {
             throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.too_large'))]);
+        }
+
+        if ($type instanceof ImagesType) {
+            $extension = $this->imageExtension($contents, $extension, $type->extensions($settings));
         }
 
         $entry = $type instanceof ImagesType ? $this->image($contents, $settings) : ['contents' => $contents, 'mime' => (string) new finfo(FILEINFO_MIME_TYPE)->buffer($contents)];
@@ -178,6 +191,27 @@ final class StoreMedia extends Action
         }
 
         return [$decoded, $name];
+    }
+
+    /**
+     * The extension to store a picture under, read from its own header before anything decodes it:
+     * ImageMagick picks a decoder from the content, so SVG, MVG or PostScript named "x.png" would
+     * reach it. Only the raster types below pass; one whose name gives the wrong extension is
+     * stored under its real one, when the field allows that.
+     *
+     * @param  list<string>  $allowed
+     */
+    private function imageExtension(string $contents, string $extension, array $allowed): string
+    {
+        $declared = @getimagesizefromstring($contents);
+        $real = $declared === false ? [] : (self::IMAGE_TYPES[$declared[2]] ?? []);
+        $usable = array_values(array_intersect($real, $allowed));
+
+        if ($usable === []) {
+            throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.unreadable'))]);
+        }
+
+        return in_array($extension, $usable, true) ? $extension : $usable[0];
     }
 
     /**
