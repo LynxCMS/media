@@ -41,13 +41,16 @@ final readonly class ServePrivateMedia
         $path = $this->paths->path("{$page}/{$file}");
         $disk = $this->paths->disk(true);
 
-        abort_unless($owner instanceof Page && $disk->exists($path), 404);
+        abort_unless($owner instanceof Page, 404);
 
+        // The page's answer first, so a visitor facing its password form can't tell which names exist.
         $refusal = $this->refusal($owner, $request, $file);
 
         if ($refusal !== null) {
             return $refusal;
         }
+
+        abort_unless($disk->exists($path), 404);
 
         // Only images, video, audio, PDFs and plain text open in the browser, never sniffed as
         // another type, and sandboxed so that even those cannot run script on the site.

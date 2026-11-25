@@ -64,10 +64,10 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->make(DoctorChecks::class)->add(QueuedSizes::class);
         // Private fields' files (ADR-0077): before Lynx's catch-all page route.
         Route::get('lynx-media/{page}/{file}', ServePrivateMedia::class)->middleware('web')
-            ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media');
+            ->whereNumber('page')->where('file', '(?!\.)[A-Za-z0-9._-]+')->name('lynx.media');
         // Temporary links (Pagefile::temporaryUrl()): the signature lets anyone holding one in.
         Route::get('lynx-media/signed/{page}/{file}', ServeSignedMedia::class)->middleware(['web', 'signed'])
-            ->whereNumber('page')->where('file', '[A-Za-z0-9._-]+')->name('lynx.media.signed');
+            ->whereNumber('page')->where('file', '(?!\.)[A-Za-z0-9._-]+')->name('lynx.media.signed');
         $this->registerRemoteRoute();
         $this->app->make(MovePrivateMedia::class)->listen();
         $this->loadTranslationsFrom(self::ROOT.'/lang', 'lynx-media');
@@ -97,7 +97,7 @@ final class MediaServiceProvider extends ServiceProvider
         $prefix = trim((string) parse_url($paths->disk(false)->url($paths->root()), PHP_URL_PATH), '/');
 
         if ($prefix !== '') {
-            Route::get($prefix.'/{page}/{file}', ServeRemoteMedia::class)->whereNumber('page')->where('file', '[A-Za-z0-9._-]+');
+            Route::get($prefix.'/{page}/{file}', ServeRemoteMedia::class)->whereNumber('page')->where('file', '(?!\.)[A-Za-z0-9._-]+');
         }
     }
 }
