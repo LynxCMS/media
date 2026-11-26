@@ -20,6 +20,10 @@ return [
     'never' => 'Los archivos de tipo [:types] pueden ejecutar código en tu sitio, así que un campo nunca puede permitirlos.',
     'max_files' => 'Solo se permite un archivo.|Se permiten como máximo :count archivos.',
     'stored_name' => 'Cada archivo necesita el nombre con el que se guardó, como "42/photo.jpg" (media.store lo devuelve).',
+    'other_page' => 'Este archivo pertenece a otra página. Súbalo a esta página con media.store.',
+    'stored_type' => 'El campo no permite archivos de este tipo.',
+    'missing_file' => 'Este archivo no está guardado. Súbalo de nuevo con media.store.',
+    'not_image' => 'Este archivo no es una imagen.',
     'tag' => 'La etiqueta [:tag] no es una de estas: :tags.',
     'language' => 'Este sitio no tiene el idioma [:language].',
 ];

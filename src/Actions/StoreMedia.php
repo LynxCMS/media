@@ -13,10 +13,13 @@ use Illuminate\Validation\ValidationException;
 use LynxCms\Core\Actions\Action;
 use LynxCms\Core\Actions\Runner\ActionContext;
 use LynxCms\Core\Actions\Runner\Input;
+use LynxCms\Core\Fields\FieldAccess;
 use LynxCms\Core\Fields\Items\ItemFieldType;
 use LynxCms\Core\Models\Field;
 use LynxCms\Core\Pages\Page;
+use LynxCms\Core\Pages\Saving\LockedFields;
 use LynxCms\Core\Support\Value;
+use LynxCms\Core\Templates\TemplateField;
 use LynxCms\Media\Downloads\RemoteFile;
 use LynxCms\Media\Fields\ImagesType;
 use LynxCms\Media\Fields\MediaFieldType;
@@ -39,6 +42,22 @@ final class StoreMedia extends Action
 
     /** Largest image decoded, in pixels: about 8000 × 6000. */
     private const int MAX_PIXELS = 50_000_000;
+
+    /**
+     * Random characters at the end of a stored name. A public field's files are on the web
+     * server's disk, served without asking Lynx, so the name is what keeps an unpublished page's
+     * files from being guessed: 16 of [a-z0-9] is about 82 bits.
+     */
+    public const int SUFFIX_LENGTH = 16;
+
+    /** Image types an images field stores, by getimagesize()'s type, with their extensions. */
+    private const array IMAGE_TYPES = [
+        IMAGETYPE_JPEG => ['jpg', 'jpeg'],
+        IMAGETYPE_PNG => ['png'],
+        IMAGETYPE_GIF => ['gif'],
+        IMAGETYPE_WEBP => ['webp'],
+        IMAGETYPE_AVIF => ['avif'],
+    ];
 
     public function __construct(private readonly MediaPaths $paths, private readonly RemoteFile $remote) {}
 
@@ -88,7 +107,8 @@ final class StoreMedia extends Action
     {
         $page = lynx()->pages->get(Value::string($input->get('page'))) ?? throw ValidationException::withMessages(['page' => Value::string(__('lynx-media::validation.page'))]);
         $context->authorize('pages.edit', $page);
-        $field = $this->mediaField($page, (string) $input->string('field'));
+        [$field, $owner] = $this->mediaField($page, (string) $input->string('field'));
+        $this->assertWritable($owner);
         $type = $field->fieldType();
         assert($type instanceof MediaFieldType);
         $settings = $field->config();
@@ -104,8 +124,12 @@ final class StoreMedia extends Action
             throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.too_large'))]);
         }
 
+        if ($type instanceof ImagesType) {
+            $extension = $this->imageExtension($contents, $extension, $type->extensions($settings));
+        }
+
         $entry = $type instanceof ImagesType ? $this->image($contents, $settings) : ['contents' => $contents, 'mime' => (string) new finfo(FILEINFO_MIME_TYPE)->buffer($contents)];
-        $file = $page->id.'/'.Str::slug(pathinfo($name, PATHINFO_FILENAME)).'-'.Str::lower(Str::random(6)).'.'.($extension === 'jpeg' ? 'jpg' : $extension);
+        $file = $page->id.'/'.Str::slug(pathinfo($name, PATHINFO_FILENAME)).'-'.Str::lower(Str::random(self::SUFFIX_LENGTH)).'.'.($extension === 'jpeg' ? 'jpg' : $extension);
         $values = ['file' => $file, 'bytes' => strlen(Value::string($entry['contents'])), 'mime' => $entry['mime']] + array_diff_key($entry, ['contents' => true, 'mime' => true]) + $this->language($input);
 
         if (! $context->dryRun) {
@@ -137,12 +161,30 @@ final class StoreMedia extends Action
     }
 
     /** A media field of the page's template, or a media subfield of one of its repeaters or matrices. */
-    private function mediaField(Page $page, string $name): Field
+    /** Refuses what pages.save would refuse for the field, before a file is written in its name. */
+    private function assertWritable(TemplateField $owner): void
     {
-        $field = $page->templateField($name)?->field;
+        if ($owner->isLocked() && ! app(LockedFields::class)->mayWrite()) {
+            throw ValidationException::withMessages(['field' => Value::string(__('lynx::validation.values.locked'))]);
+        }
 
-        if ($field instanceof Field && $field->fieldType() instanceof MediaFieldType) {
-            return $field;
+        if (! app(FieldAccess::class)->canEdit($owner->field)) {
+            throw ValidationException::withMessages(['field' => Value::string(__('lynx::validation.values.no_access'))]);
+        }
+    }
+
+    /**
+     * The media field, and the template's field that holds it: itself, or the repeater or matrix
+     * its items are in.
+     *
+     * @return array{0: Field, 1: TemplateField}
+     */
+    private function mediaField(Page $page, string $name): array
+    {
+        $templateField = $page->templateField($name);
+
+        if ($templateField instanceof TemplateField && $templateField->field->fieldType() instanceof MediaFieldType) {
+            return [$templateField->field, $templateField];
         }
 
         foreach (lynx()->templates->fields($page->template()->name) as $templateField) {
@@ -150,7 +192,7 @@ final class StoreMedia extends Action
 
             foreach ($type instanceof ItemFieldType ? $type->allSubfields($templateField->field->config()) : [] as $subfield) {
                 if ($subfield->name() === $name && $subfield->type() instanceof MediaFieldType) {
-                    return $subfield->field;
+                    return [$subfield->field, $templateField];
                 }
             }
         }
@@ -178,6 +220,27 @@ final class StoreMedia extends Action
         }
 
         return [$decoded, $name];
+    }
+
+    /**
+     * The extension to store a picture under, read from its own header before anything decodes it:
+     * ImageMagick picks a decoder from the content, so SVG, MVG or PostScript named "x.png" would
+     * reach it. Only the raster types below pass; one whose name gives the wrong extension is
+     * stored under its real one, when the field allows that.
+     *
+     * @param  list<string>  $allowed
+     */
+    private function imageExtension(string $contents, string $extension, array $allowed): string
+    {
+        $declared = @getimagesizefromstring($contents);
+        $real = $declared === false ? [] : (self::IMAGE_TYPES[$declared[2]] ?? []);
+        $usable = array_values(array_intersect($real, $allowed));
+
+        if ($usable === []) {
+            throw ValidationException::withMessages(['file' => Value::string(__('lynx-media::validation.unreadable'))]);
+        }
+
+        return in_array($extension, $usable, true) ? $extension : $usable[0];
     }
 
     /**

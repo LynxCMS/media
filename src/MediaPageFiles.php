@@ -6,6 +6,7 @@ namespace LynxCms\Media;
 
 use Illuminate\Support\Str;
 use LynxCms\Core\Content\PageFiles;
+use LynxCms\Media\Actions\StoreMedia;
 
 /**
  * Media files for content packages (ADR-0050): read from and written to the media disk, in the
@@ -42,7 +43,7 @@ final readonly class MediaPageFiles implements PageFiles
         }
 
         if ($existing !== null) {
-            $target = "{$pageId}/".pathinfo($name, PATHINFO_FILENAME).'-'.Str::lower(Str::random(6)).'.'.pathinfo($name, PATHINFO_EXTENSION);
+            $target = "{$pageId}/".pathinfo($name, PATHINFO_FILENAME).'-'.Str::lower(Str::random(StoreMedia::SUFFIX_LENGTH)).'.'.pathinfo($name, PATHINFO_EXTENSION);
         }
 
         if (! $dryRun) {

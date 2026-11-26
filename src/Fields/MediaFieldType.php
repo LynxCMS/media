@@ -16,7 +16,6 @@ use LynxCms\Core\Fields\Items\ItemNormalizer;
 use LynxCms\Core\Fields\Items\ItemProperty;
 use LynxCms\Core\Fields\Items\NestsInItems;
 use LynxCms\Core\Fields\NeedsSavedPage;
-use LynxCms\Core\Languages\LanguageRegistry;
 use LynxCms\Core\Models\Field;
 use LynxCms\Core\Support\Value;
 use LynxCms\Media\MediaPaths;
@@ -113,44 +112,6 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         return (bool) ($settings['per_language'] ?? false);
     }
 
-    /**
-     * The most files one language reads: all of them, or with a file per language, the largest
-     * group of one language's files, or of the files for every language.
-     *
-     * @param  list<array<string, mixed>>  $items
-     * @param  array<string, mixed>  $settings
-     */
-    private function mostFilesInOneLanguage(array $items, array $settings): int
-    {
-        if (! self::isPerLanguage($settings)) {
-            return count($items);
-        }
-
-        $groups = array_count_values(array_map(fn (array $item): string => Value::string(Value::map($item['values'] ?? [])['language'] ?? ''), $items));
-
-        return $groups === [] ? 0 : max($groups);
-    }
-
-    /**
-     * A file's language: a code the site has, or null for every language.
-     *
-     * @param  array<string, string>  $errors
-     */
-    private function language(mixed $language, string $key, array &$errors): ?string
-    {
-        $code = trim(Value::string($language));
-
-        if ($code === '') {
-            return null;
-        }
-
-        if (lynx()->languages->find($code) === null) {
-            $errors[$key] = Value::string(__('lynx-media::validation.language', ['language' => $code]));
-        }
-
-        return $code;
-    }
-
     public function subfields(array $settings, ?string $type): array
     {
         return [];
@@ -180,7 +141,7 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
 
         $max = Value::int($settings['max_files'] ?? 0);
 
-        if ($max > 0 && $this->mostFilesInOneLanguage($items, $settings) > $max) {
+        if ($max > 0 && MediaItemChecks::mostFilesInOneLanguage($items, $settings) > $max) {
             $errors[''] = trans_choice('lynx-media::validation.max_files', $max);
         }
 
@@ -204,8 +165,14 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
         $values = Value::map($raw['values'] ?? []);
         $file = Value::string($values['file'] ?? '');
 
+        $facts = [];
+
         if (preg_match('/^\d+\/(?!\.)[A-Za-z0-9._-]+$/D', $file) !== 1) {
             $errors["{$index}.file"] = Value::string(__('lynx-media::validation.stored_name'));
+        } else {
+            // On a save, only this page's own files, with their real size, type and dimensions.
+            $facts = app(StoredFileCheck::class)->facts($file, self::isPrivate($settings), $this instanceof ImagesType, $this->extensions($settings));
+            $errors += is_string($facts) ? ["{$index}.file" => $facts] : [];
         }
 
         $key = Value::string($raw['key'] ?? '');
@@ -215,14 +182,14 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
             'type' => null,
             'enabled' => (bool) ($raw['enabled'] ?? true),
             'depth' => 0,
-            'values' => array_filter([
+            'values' => array_filter(array_replace([
                 'file' => $file,
                 'bytes' => Value::int($values['bytes'] ?? 0),
                 'mime' => Value::string($values['mime'] ?? ''),
-                'tags' => $this->cleanTags($values['tags'] ?? [], $settings, "{$index}.tags", $errors),
-                'description' => $this->descriptions($values['description'] ?? null, "{$index}.description", $errors),
-                'language' => $this->language($values['language'] ?? null, "{$index}.language", $errors),
-            ] + $this->details($values, $index, $normalizer), fn (mixed $v): bool => ! in_array($v, [[], '', null], true)),
+                'tags' => MediaItemChecks::tags($values['tags'] ?? [], $settings, "{$index}.tags", $errors),
+                'description' => MediaItemChecks::descriptions($values['description'] ?? null, "{$index}.description", $errors),
+                'language' => MediaItemChecks::language($values['language'] ?? null, "{$index}.language", $errors),
+            ] + $this->details($values, $index, $normalizer), is_array($facts) ? $facts : []), fn (mixed $v): bool => ! in_array($v, [[], '', null], true)),
         ];
     }
 
@@ -295,47 +262,6 @@ abstract class MediaFieldType extends ItemFieldType implements HasItemProperties
     protected function isTranslatedKey(string $name): bool
     {
         return $name === 'description';
-    }
-
-    /**
-     * @param  array<string, mixed>  $settings
-     * @param  array<string, string>  $errors
-     * @return list<string>
-     */
-    private function cleanTags(mixed $tags, array $settings, string $key, array &$errors): array
-    {
-        $list = is_string($tags) ? explode(',', $tags) : Value::list($tags);
-        $clean = array_values(array_unique(array_filter(array_map(fn (mixed $tag): string => trim(Value::string($tag)), $list))));
-        $allowed = Value::strings($settings['tags'] ?? []);
-
-        foreach ($allowed === [] ? [] : array_diff($clean, $allowed) as $tag) {
-            $errors[$key] = Value::string(__('lynx-media::validation.tag', ['tag' => $tag, 'tags' => implode(', ', $allowed)]));
-        }
-
-        return $clean;
-    }
-
-    /**
-     * Text, or language code => text; plain text counts as the default language.
-     *
-     * @param  array<string, string>  $errors
-     * @return array<string, string>
-     */
-    private function descriptions(mixed $description, string $key, array &$errors): array
-    {
-        $languages = app(LanguageRegistry::class);
-        $map = is_array($description) ? $description : (Value::string($description) === '' ? [] : [(string) $languages->default()->code => $description]);
-        $clean = [];
-
-        foreach ($map as $code => $text) {
-            if ($languages->find((string) $code) === null) {
-                $errors["{$key}.{$code}"] = Value::string(__('lynx::validation.language.missing', ['language' => $code]));
-            } elseif (trim(Value::string($text)) !== '') {
-                $clean[(string) $code] = mb_substr(trim(Value::string($text)), 0, 1000);
-            }
-        }
-
-        return $clean;
     }
 
     protected function itemType(mixed $type, int $index, array $settings, ItemNormalizer $normalizer): ?string
